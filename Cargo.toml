@@ -1,0 +1,14 @@
+[package]
+name = "oxide-mvu"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A standalone MVU runtime for Rust with no_std support for embedded systems"
+
+[features]
+default = []
+std = []
+
+[dependencies]
+portable-atomic-util = { version = "0.2.4", default-features = false, features = ["alloc"] }
+spin = { version = "0.10.0", features = ["portable_atomic"] }
