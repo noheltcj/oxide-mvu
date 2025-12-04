@@ -29,10 +29,10 @@ Add to your `Cargo.toml`:
 oxide-mvu = "0.1.0"
 ```
 
-For `std` environments:
+For `no_std` environments:
 ```toml
 [dependencies]
-oxide-mvu = { version = "0.1.0", features = ["std"] }
+oxide-mvu = { version = "0.1.0", features = ["no_std"] }
 ```
 
 ## Usage
@@ -122,30 +122,89 @@ fn main() {
 
 ## Testing
 
-State changes are driven via Props callbacks, making the flow easy to test:
+`oxide-mvu` provides specialized testing utilities for integration testing your MVU applications.
+
+### Enabling Testing Utilities
+
+To access the testing helpers in your project, enable the `testing` feature:
+
+```toml
+[dev-dependencies]
+oxide-mvu = { version = "0.1.0", features = ["testing"] }
+```
+
+This gives you access to:
+- `TestMvuRuntime` - Runtime with manual event processing control
+- `TestMvuDriver` - Driver for manually processing events in tests
+- `TestRenderer` - Renderer that captures Props for assertions
+
+### Unit Testing
+
+State transitions are pure functions, making them easy to unit test:
 
 ```rust
 #[test]
-fn test_counter() {
+fn test_increment() {
     let logic = Logic;
     let model = Model { count: 0 };
-    let (model, _) = logic.init(model);
-    let (model, _) = logic.update(Event::Increment, &model);
-    assert_eq!(model.count, 1);
+    let (new_model, _effect) = logic.update(Event::Increment, &model);
+    assert_eq!(new_model.count, 1);
 }
 ```
 
-See `tests/lib_test.rs` for a complete example of testing the full MVU loop.
+### Integration Testing
+
+Use `TestMvuRuntime` and `TestRenderer` to test the full MVU loop:
+
+```rust
+use oxide_mvu::{TestMvuRuntime, TestRenderer, TestMvuDriver};
+
+#[test]
+fn test_full_mvu_loop() {
+    // Create a TestRenderer to capture renders
+    let renderer = TestRenderer::new();
+
+    // Create runtime with test helpers
+    let runtime = TestMvuRuntime::new(
+        Model { count: 0 },
+        Box::new(Logic),
+        renderer.boxed(),
+    );
+
+    // Run and get driver for manual event control
+    let mut driver = runtime.run();
+
+    // Verify initial render
+    assert_eq!(renderer.count(), 1);
+    renderer.with_renders(|renders| {
+        assert_eq!(renders[0].count, 0);
+    });
+
+    // Trigger event via Props callback
+    renderer.with_renders(|renders| {
+        (renders[0].on_increment)();
+    });
+
+    // Manually process events
+    driver.process_events();
+
+    // Verify updated render
+    assert_eq!(renderer.count(), 2);
+    renderer.with_renders(|renders| {
+        assert_eq!(renders[1].count, 1);
+    });
+}
+```
+
+### Key Testing Concepts
+
+- **`TestMvuRuntime`**: Unlike `MvuRuntime`, events are not automatically processed. You must call `driver.process_events()` to manually drive the event loop.
+- **`TestRenderer::boxed()`**: Returns a boxed renderer while keeping a handle for assertions.
+- **`renderer.with_renders()`**: Access all captured Props for assertions or to trigger callbacks.
+- **`driver.process_events()`**: Process all queued events until the queue is empty.
+
+See `tests/lib_test.rs` for complete examples.
 
 ## License
 
-Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
-
-## Contribution
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)

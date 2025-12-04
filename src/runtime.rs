@@ -1,14 +1,9 @@
 //! The MVU runtime that orchestrates the event loop.
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-
-#[cfg(feature = "std")]
-use std::boxed::Box;
-#[cfg(feature = "std")]
-use std::vec::Vec;
 
 use portable_atomic_util::Arc;
 use spin::Mutex;
@@ -34,7 +29,7 @@ struct RuntimeState<Event: Send, Model: Clone + Send> {
 /// when [`Emitter::emit`] is called, regardless of which thread it's called from.
 /// Events are processed synchronously in a thread-safe manner.
 ///
-/// For testing with manual event control, use [`TestMvuRuntime`](crate::TestMvuRuntime).
+/// For testing with manual control, use [`TestMvuRuntime`] with a [`crate::TestRenderer`].
 ///
 /// See the [crate-level documentation](crate) for a complete example.
 pub struct MvuRuntime<Event: Send, Model: Clone + Send, Props> {
@@ -45,13 +40,15 @@ pub struct MvuRuntime<Event: Send, Model: Clone + Send, Props> {
 }
 
 impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRuntime<Event, Model, Props> {
-    /// Create a new MVU runtime.
+    /// Create a new runtime.
+    ///
+    /// The runtime will not be started until MvuRuntime::run is called.
     ///
     /// # Arguments
     ///
-    /// * `init_model` - The initial model state
-    /// * `logic` - The logic implementation
-    /// * `renderer` - Renderer implementation for rendering Props
+    /// * `init_model` - The initial state
+    /// * `logic` - Application logic implementing MvuLogic
+    /// * `renderer` - Platform rendering implementation for rendering Props
     pub fn new(
         init_model: Model,
         logic: Box<dyn MvuLogic<Event, Model, Props> + Send>,
@@ -72,11 +69,11 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRu
         MvuRuntime { logic, renderer, state, emitter }
     }
 
-    /// Initialize and run the MVU runtime.
+    /// Initialize the runtime loop.
     ///
-    /// This initializes the model, processes initial effects, and renders the
-    /// initial state. After `run()` completes, the emitter will continue to
-    /// automatically process events when [`Emitter::emit`] is called.
+    /// - Uses the MvuLogic::init function to create and enqueue initial side effects.
+    /// - Reduces the initial Model provided at construction to Props via MvuLogic::view.
+    /// - Renders the initial Props.
     pub fn run(mut self) {
         // Initialize the model and get initial effects
         let init_model = {
@@ -99,11 +96,9 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRu
         };
 
         self.renderer.render(initial_props);
-
-        // TODO: Process initial effects
     }
 
-    // TODO: Synchronize on this call rather than on state access.
+    #[cfg(any(test, feature = "testing"))]
     fn step(&mut self, event: Event) {
         // Reduce event and render props
         let (model, effect, props) = self.reduce_event(event);
@@ -124,6 +119,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRu
         self.process_queued_events()
     }
 
+    #[cfg(any(test, feature = "testing"))]
     /// Dispatch a single event through update -> view -> render.
     fn reduce_event(&self, event: Event) -> (Model, Effect<Event>, Props) {
         // Update model just event
@@ -139,6 +135,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRu
         (new_model, effect, props)
     }
 
+    #[cfg(any(test, feature = "testing"))]
     /// Process all queued events (for testing).
     ///
     /// This is exposed for TestMvuRuntime to manually drive event processing.
@@ -157,27 +154,34 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRu
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
 /// Test runtime driver for manual event processing control.
+///
+/// Only available with the `testing` feature or during tests.
 ///
 /// Returned by [`TestMvuRuntime::run`]. Provides methods to manually
 /// emit events and process the event queue for precise control in tests.
 ///
 /// See [`TestMvuRuntime`] for usage.
 pub struct TestMvuDriver<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> {
-    runtime: MvuRuntime<Event, Model, Props>,
+    _runtime: MvuRuntime<Event, Model, Props>,
 }
 
+#[cfg(any(test, feature = "testing"))]
 impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> TestMvuDriver<Event, Model, Props> {
     /// Process all queued events.
     ///
     /// This processes events until the queue is empty. Call this after emitting
     /// events to drive the event loop in tests.
     pub fn process_events(&mut self) {
-        self.runtime.process_queued_events();
+        self._runtime.process_queued_events();
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
 /// Test runtime for MVU with manual event processing control.
+///
+/// Only available with the `testing` feature or during tests.
 ///
 /// Unlike [`MvuRuntime`], this runtime does not automatically
 /// process events when they are emitted. Instead, tests must manually call
@@ -218,6 +222,7 @@ pub struct TestMvuRuntime<Event: Send + 'static, Model: Clone + Send + 'static, 
     runtime: MvuRuntime<Event, Model, Props>,
 }
 
+#[cfg(any(test, feature = "testing"))]
 impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> TestMvuRuntime<Event, Model, Props> {
     /// Create a new test runtime.
     ///
@@ -283,7 +288,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> TestM
         }
 
         TestMvuDriver {
-            runtime: self.runtime,
+            _runtime: self.runtime,
         }
     }
 }

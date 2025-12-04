@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(feature = "no_std", no_std)]
 
 //! A lightweight Model-View-Update (MVU) runtime for Rust with `no_std` support.
 //!
@@ -59,11 +59,8 @@
 //! runtime.run();
 //! ```
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no_std")]
 extern crate alloc;
-
-#[cfg(feature = "std")]
-extern crate std as alloc;
 
 // Module declarations
 mod logic;
@@ -77,4 +74,10 @@ pub use logic::MvuLogic;
 pub use renderer::Renderer;
 pub use effect::Effect;
 pub use emitter::Emitter;
-pub use runtime::{MvuRuntime, TestMvuRuntime, TestMvuDriver};
+pub use runtime::MvuRuntime;
+
+// Test utilities (only available with 'testing' feature or during tests)
+#[cfg(any(test, feature = "testing"))]
+pub use renderer::TestRenderer;
+#[cfg(any(test, feature = "testing"))]
+pub use runtime::{TestMvuRuntime, TestMvuDriver};

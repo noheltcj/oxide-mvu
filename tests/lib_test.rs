@@ -1,10 +1,4 @@
-use oxide_mvu::{Emitter, Effect, TestMvuRuntime, TestMvuDriver, MvuLogic, Renderer};
-
-extern crate alloc;
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-use portable_atomic_util::Arc;
-use spin::Mutex;
+use oxide_mvu::{Emitter, Effect, TestMvuRuntime, TestMvuDriver, MvuLogic, TestRenderer};
 
 #[derive(Clone, Debug, PartialEq)]
 enum TestEvent {
@@ -62,86 +56,66 @@ impl MvuLogic<TestEvent, TestModel, TestProps> for TestLogic {
     }
 }
 
-struct TestRenderer {
-    renders: Arc<Mutex<Vec<TestProps>>>,
-}
-
-impl Renderer<TestProps> for TestRenderer {
-    fn render(&mut self, props: TestProps) {
-        // Simply capture each Props emission for later analysis
-        self.renders.lock().push(props);
-    }
-}
-
-// Test helper that runs and returns both driver and renders
-fn run_test(initial_events: Vec<TestEvent>) -> (TestMvuDriver<TestEvent, TestModel, TestProps>, Arc<Mutex<Vec<TestProps>>>) {
-    let renders = Arc::new(Mutex::new(Vec::new()));
-    let renderer = Box::new(TestRenderer {
-        renders: renders.clone(),
-    });
-
+// Test helper that runs and returns both driver and renderer
+fn run_test(initial_events: Vec<TestEvent>) -> (TestMvuDriver<TestEvent, TestModel, TestProps>, TestRenderer<TestProps>) {
+    let renderer = TestRenderer::new();
     let model = TestModel { count: 0 };
     let logic = Box::new(TestLogic { initial_events });
 
-    let runtime = TestMvuRuntime::new(model, logic, renderer);
+    let runtime = TestMvuRuntime::new(model, logic, renderer.boxed());
     let driver = runtime.run();
 
-    (driver, renders)
+    (driver, renderer)
 }
 
-// Test helper that returns both runtime driver and renders for interactive testing
-fn setup_test(initial_events: Vec<TestEvent>) -> (TestMvuDriver<TestEvent, TestModel, TestProps>, Arc<Mutex<Vec<TestProps>>>) {
-    let renders = Arc::new(Mutex::new(Vec::new()));
-    let renderer = Box::new(TestRenderer {
-        renders: renders.clone(),
-    });
-
+// Test helper that returns both runtime driver and renderer for interactive testing
+fn setup_test(initial_events: Vec<TestEvent>) -> (TestMvuDriver<TestEvent, TestModel, TestProps>, TestRenderer<TestProps>) {
+    let renderer = TestRenderer::new();
     let model = TestModel { count: 0 };
     let logic = Box::new(TestLogic { initial_events });
 
-    let runtime = TestMvuRuntime::new(model, logic, renderer);
+    let runtime = TestMvuRuntime::new(model, logic, renderer.boxed());
     let driver = runtime.run();
 
-    (driver, renders)
+    (driver, renderer)
 }
 
 #[test]
 fn given_no_initial_effect_when_ran_should_render_initial_props() {
-    let (_driver, renders) = run_test(vec![]);
+    let (_driver, renderer) = run_test(vec![]);
 
-    let final_renders = renders.lock();
-    let counter_values: Vec<i32> = final_renders.iter().map(|props| props.count).collect();
-    assert_eq!(counter_values, vec![0]);
+    assert_eq!(renderer.count(), 1);
+    renderer.with_renders(|renders| {
+        assert_eq!(renders[0].count, 0);
+    });
 }
 
 #[test]
 fn given_an_initial_increment_event_when_ran_should_render_twice() {
-    let (mut driver, renders) = run_test(vec![TestEvent::Increment]);
+    let (mut driver, renderer) = run_test(vec![TestEvent::Increment]);
 
-    // Process events emitted by initial effects
     driver.process_events();
 
-    let final_renders = renders.lock();
-    let counter_values: Vec<i32> = final_renders.iter().map(|props| props.count).collect();
-    assert_eq!(counter_values, vec![0, 1]);
+    assert_eq!(renderer.count(), 2);
+    renderer.with_renders(|renders| {
+        assert_eq!(renders[0].count, 0);
+        assert_eq!(renders[1].count, 1);
+    });
 }
 
 #[test]
-fn given_props_with_callback_when_invoked_should_render_again() {
-    let (mut driver, renders) = setup_test(vec![]);
+fn given_initial_props_when_invoked_should_render_again() {
+    let (mut driver, renderer) = setup_test(vec![]);
 
-    // Call the callback from the first render
-    {
-        let initial_renders = renders.lock();
-        (initial_renders[0].on_increment)();
-    }
+    renderer.with_renders(|renders| {
+        (renders[0].on_increment)();
+    });
 
-    // TODO: The primary runtime should process events on its own.
-    // Process the event triggered by the callback
     driver.process_events();
 
-    // Verify new render was emitted just incremented count
-    let final_renders = renders.lock();
-    assert_eq!(final_renders.len(), 2);
-    assert_eq!(final_renders[1].count, 1);
+    // Verify new render was emitted with incremented count
+    assert_eq!(renderer.count(), 2);
+    renderer.with_renders(|renders| {
+        assert_eq!(renders[1].count, 1);
+    });
 }
