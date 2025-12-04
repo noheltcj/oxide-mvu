@@ -15,6 +15,7 @@ dependencies = [
 name = "oxide-mvu"
 version = "0.1.0"
 dependencies = [
+ "oxide-mvu",
  "portable-atomic-util",
  "spin",
 ]

@@ -1,10 +1,7 @@
 //! Event emitter for embedding callbacks in Props.
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-
-#[cfg(feature = "std")]
-use std::boxed::Box;
 
 use portable_atomic_util::Arc;
 use spin::Mutex;

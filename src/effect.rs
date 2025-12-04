@@ -1,14 +1,10 @@
 //! Declarative effect system for describing deferred event processing.
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 
-#[cfg(feature = "std")]
-use std::boxed::Box;
-#[cfg(feature = "std")]
-use std::vec::Vec;
 use crate::Emitter;
 
 /// Declarative description of events to be processed.
