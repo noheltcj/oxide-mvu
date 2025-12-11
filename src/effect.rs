@@ -36,6 +36,7 @@ use crate::Emitter;
 /// // No side effects
 /// let effect: Effect<Event> = Effect::none();
 /// ```
+#[allow(clippy::type_complexity)]
 pub struct Effect<Event>(Box<dyn Fn(&Emitter<Event>) + Send + 'static>);
 
 impl<Event: 'static> Effect<Event> {
@@ -64,17 +65,16 @@ impl<Event: 'static> Effect<Event> {
     ///
     /// let effect = Effect::just(Event::Refresh);
     /// ```
-    pub fn just(event: Event) -> Self where Event: Clone + Send + 'static {
-        Self(
-            Box::new(
-                move |emitter: &Emitter<Event>| {
-                    emitter.emit(event.clone());
-                }
-            )
-        )
+    pub fn just(event: Event) -> Self
+    where
+        Event: Clone + Send + 'static,
+    {
+        Self(Box::new(move |emitter: &Emitter<Event>| {
+            emitter.emit(event.clone());
+        }))
     }
 
-    /// Create an empty effect (alias for [`new`](Self::new)).
+    /// Create an empty effect.
     ///
     /// Prefer this when semantically indicating "no side effects".
     ///
@@ -111,14 +111,10 @@ impl<Event: 'static> Effect<Event> {
     /// ]);
     /// ```
     pub fn batch(effects: Vec<Effect<Event>>) -> Self {
-        Self(
-            Box::new(
-                move |emitter: &Emitter<Event>| {
-                    for effect in &effects {
-                        effect.execute(emitter);
-                    }
-                }
-            )
-        )
+        Self(Box::new(move |emitter: &Emitter<Event>| {
+            for effect in &effects {
+                effect.execute(emitter);
+            }
+        }))
     }
 }

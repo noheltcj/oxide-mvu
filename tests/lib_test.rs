@@ -1,4 +1,4 @@
-use oxide_mvu::{Emitter, Effect, TestMvuRuntime, TestMvuDriver, MvuLogic, TestRenderer};
+use oxide_mvu::{Effect, Emitter, MvuLogic, TestMvuDriver, TestMvuRuntime, TestRenderer};
 
 #[derive(Clone, Debug, PartialEq)]
 enum TestEvent {
@@ -16,7 +16,7 @@ struct TestProps {
 }
 
 struct TestLogic {
-    initial_events: Vec<TestEvent>
+    initial_events: Vec<TestEvent>,
 }
 
 impl MvuLogic<TestEvent, TestModel, TestProps> for TestLogic {
@@ -28,7 +28,7 @@ impl MvuLogic<TestEvent, TestModel, TestProps> for TestLogic {
                 self.initial_events
                     .iter()
                     .map(|event| Effect::just(event.clone()))
-                    .collect()
+                    .collect(),
             )
         };
         (model, effect)
@@ -57,7 +57,12 @@ impl MvuLogic<TestEvent, TestModel, TestProps> for TestLogic {
 }
 
 // Test helper that runs and returns both driver and renderer
-fn run_test(initial_events: Vec<TestEvent>) -> (TestMvuDriver<TestEvent, TestModel, TestProps>, TestRenderer<TestProps>) {
+fn run_test(
+    initial_events: Vec<TestEvent>,
+) -> (
+    TestMvuDriver<TestEvent, TestModel, TestProps>,
+    TestRenderer<TestProps>,
+) {
     let renderer = TestRenderer::new();
     let model = TestModel { count: 0 };
     let logic = Box::new(TestLogic { initial_events });
@@ -69,7 +74,12 @@ fn run_test(initial_events: Vec<TestEvent>) -> (TestMvuDriver<TestEvent, TestMod
 }
 
 // Test helper that returns both runtime driver and renderer for interactive testing
-fn setup_test(initial_events: Vec<TestEvent>) -> (TestMvuDriver<TestEvent, TestModel, TestProps>, TestRenderer<TestProps>) {
+fn setup_test(
+    initial_events: Vec<TestEvent>,
+) -> (
+    TestMvuDriver<TestEvent, TestModel, TestProps>,
+    TestRenderer<TestProps>,
+) {
     let renderer = TestRenderer::new();
     let model = TestModel { count: 0 };
     let logic = Box::new(TestLogic { initial_events });

@@ -63,21 +63,21 @@
 extern crate alloc;
 
 // Module declarations
-mod logic;
-mod renderer;
 mod effect;
 mod emitter;
+mod logic;
+mod renderer;
 mod runtime;
 
 // Public re-exports
-pub use logic::MvuLogic;
-pub use renderer::Renderer;
 pub use effect::Effect;
 pub use emitter::Emitter;
+pub use logic::MvuLogic;
+pub use renderer::Renderer;
 pub use runtime::MvuRuntime;
 
 // Test utilities (only available with 'testing' feature or during tests)
 #[cfg(any(test, feature = "testing"))]
 pub use renderer::TestRenderer;
 #[cfg(any(test, feature = "testing"))]
-pub use runtime::{TestMvuRuntime, TestMvuDriver};
+pub use runtime::{TestMvuDriver, TestMvuRuntime};

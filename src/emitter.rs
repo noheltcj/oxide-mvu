@@ -59,6 +59,7 @@ use spin::Mutex;
 ///     }
 /// }
 /// ```
+#[allow(clippy::type_complexity)]
 pub struct Emitter<Event>(pub(crate) Arc<Mutex<Box<dyn FnMut(Event) + Send + 'static>>>);
 
 impl<Event> Clone for Emitter<Event> {

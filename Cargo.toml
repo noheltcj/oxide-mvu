@@ -2,8 +2,14 @@
 name = "oxide-mvu"
 version = "0.1.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 description = "A standalone MVU runtime for Rust with no_std support for embedded systems"
+repository = "https://github.com/noheltcj/oxide-mvu"
+homepage = "https://github.com/noheltcj/oxide-mvu"
+documentation = "https://docs.rs/oxide-mvu"
+keywords = ["mvu", "architecture", "no-std", "embedded", "state-management"]
+categories = ["no-std", "embedded", "rust-patterns"]
+exclude = []
 
 [features]
 no_std = []
