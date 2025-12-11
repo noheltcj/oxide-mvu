@@ -8,13 +8,13 @@ use alloc::vec::Vec;
 use portable_atomic_util::Arc;
 use spin::Mutex;
 
-use crate::{Emitter, Effect, Renderer, MvuLogic};
+use crate::{Effect, Emitter, MvuLogic, Renderer};
 
 /// Internal state for the MVU runtime.
 struct RuntimeState<Event: Send, Model: Clone + Send> {
     model: Model,
     event_queue: Vec<Event>,
-    effects_queue: Vec<Effect<Event>>
+    effects_queue: Vec<Effect<Event>>,
 }
 
 /// The MVU runtime that orchestrates the event loop.
@@ -39,7 +39,9 @@ pub struct MvuRuntime<Event: Send, Model: Clone + Send, Props> {
     emitter: Emitter<Event>,
 }
 
-impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRuntime<Event, Model, Props> {
+impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
+    MvuRuntime<Event, Model, Props>
+{
     /// Create a new runtime.
     ///
     /// The runtime will not be started until MvuRuntime::run is called.
@@ -58,7 +60,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRu
         let state = Arc::new(Mutex::new(RuntimeState {
             model: init_model,
             event_queue: Vec::new(),
-            effects_queue: Vec::new()
+            effects_queue: Vec::new(),
         }));
 
         let state_clone = state.clone();
@@ -66,7 +68,12 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> MvuRu
             state_clone.lock().event_queue.push(event);
         });
 
-        MvuRuntime { logic, renderer, state, emitter }
+        MvuRuntime {
+            logic,
+            renderer,
+            state,
+            emitter,
+        }
     }
 
     /// Initialize the runtime loop.
@@ -168,7 +175,9 @@ pub struct TestMvuDriver<Event: Send + 'static, Model: Clone + Send + 'static, P
 }
 
 #[cfg(any(test, feature = "testing"))]
-impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> TestMvuDriver<Event, Model, Props> {
+impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
+    TestMvuDriver<Event, Model, Props>
+{
     /// Process all queued events.
     ///
     /// This processes events until the queue is empty. Call this after emitting
@@ -223,7 +232,9 @@ pub struct TestMvuRuntime<Event: Send + 'static, Model: Clone + Send + 'static, 
 }
 
 #[cfg(any(test, feature = "testing"))]
-impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> TestMvuRuntime<Event, Model, Props> {
+impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
+    TestMvuRuntime<Event, Model, Props>
+{
     /// Create a new test runtime.
     ///
     /// Creates an emitter that enqueues events without automatically processing them.
@@ -236,7 +247,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> TestM
         let state = Arc::new(Mutex::new(RuntimeState {
             model: init_model,
             event_queue: Vec::new(),
-            effects_queue: Vec::new()
+            effects_queue: Vec::new(),
         }));
 
         let state_clone = state.clone();
@@ -245,7 +256,12 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> TestM
         });
 
         TestMvuRuntime {
-            runtime: MvuRuntime { logic, renderer, state, emitter },
+            runtime: MvuRuntime {
+                logic,
+                renderer,
+                state,
+                emitter,
+            },
         }
     }
 

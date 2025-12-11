@@ -114,6 +114,13 @@ impl<Props> Renderer<Props> for InternalTestRenderer<Props> {
 }
 
 #[cfg(any(test, feature = "testing"))]
+impl<Props: 'static + Send> Default for TestRenderer<Props> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
 impl<Props: 'static + Send> TestRenderer<Props> {
     pub fn new() -> Self {
         Self {

@@ -1,6 +1,6 @@
 //! Application logic trait defining the MVU contract.
 
-use crate::{Emitter, Effect};
+use crate::{Effect, Emitter};
 
 /// Application logic trait defining the MVU contract.
 ///
