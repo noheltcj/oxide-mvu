@@ -60,7 +60,7 @@ pub trait Renderer<Props> {
 /// # Example
 ///
 /// ```rust
-/// use oxide_mvu::{TestRenderer, TestMvuRuntime, MvuLogic, Effect, Emitter};
+/// use oxide_mvu::{create_test_spawner, TestRenderer, TestMvuRuntime, MvuLogic, Effect, Emitter};
 ///
 /// # struct Props { count: i32 }
 /// #
@@ -88,6 +88,7 @@ pub trait Renderer<Props> {
 ///     Model { count: 0 },
 ///     Box::new(Logic),
 ///     renderer.boxed(),
+///     create_test_spawner()
 /// );
 ///
 /// let driver = runtime.run();

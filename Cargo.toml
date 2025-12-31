@@ -1,6 +1,6 @@
 [package]
 name = "oxide-mvu"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "A standalone MVU runtime for Rust with no_std support for embedded systems"
@@ -13,11 +13,19 @@ exclude = []
 
 [features]
 no_std = []
-testing = []
+testing = ["futures"]
+futures = ["dep:futures"]
 
 [dependencies]
+futures = { version = "0.3.31", features = ["executor"], optional = true }
 portable-atomic-util = { version = "0.2.4", default-features = false, features = ["alloc"] }
 spin = { version = "0.10.0", features = ["portable_atomic"] }
 
 [dev-dependencies]
 oxide-mvu = { path = ".", features = ["testing"] }
+mockall = "0.14"
+futures = "0.3.31"
+
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
