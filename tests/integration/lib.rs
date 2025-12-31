@@ -1,7 +1,7 @@
 mod simple_logic;
 
 use std::sync::Arc;
-use oxide_mvu::{Effect, TestMvuDriver, TestMvuRuntime, TestRenderer};
+use oxide_mvu::{create_test_spawner, Effect, TestMvuDriver, TestMvuRuntime, TestRenderer};
 pub(crate) use simple_logic::*;
 
 mod reduction_and_emission_tests;
@@ -71,7 +71,7 @@ fn create_test_driver_and_renderer(
     let mut on_increment_side_effect = Arc::new(test_creation_parameters.on_increment_effect);
     let mut mock_effects = MockEffectsDependency::new();
     mock_effects.expect_on_increment_side_effect()
-        .returning(move || { Effect::just() });
+        .returning(move || { Effect::none() });
 
     let logic = Box::new(
         TestLogic {
@@ -80,7 +80,7 @@ fn create_test_driver_and_renderer(
         }
     );
 
-    let runtime = TestMvuRuntime::new(model, logic, renderer.boxed());
+    let runtime = TestMvuRuntime::new(model, logic, renderer.boxed(), create_test_spawner());
     let driver = runtime.run();
 
     (driver, renderer)
