@@ -1,17 +1,17 @@
 //! Declarative effect system for describing deferred event processing.
 
-#[cfg(not(feature = "no_std"))]
-use std::future::Future;
-#[cfg(not(feature = "no_std"))]
-use std::pin::Pin;
-#[cfg(feature = "no_std")]
-use core::future::Future;
-#[cfg(feature = "no_std")]
-use core::pin::Pin;
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+#[cfg(feature = "no_std")]
+use core::future::Future;
+#[cfg(feature = "no_std")]
+use core::pin::Pin;
+#[cfg(not(feature = "no_std"))]
+use std::future::Future;
+#[cfg(not(feature = "no_std"))]
+use std::pin::Pin;
 
 use crate::Emitter;
 
@@ -89,7 +89,7 @@ impl<Event: 'static> Effect<Event> {
     {
         Self(Box::new(move |emitter: &Emitter<Event>| {
             let emitter = emitter.clone();
-            Box::pin(async move { emitter.emit(event) }) as Pin<Box<dyn Future<Output=()> + Send>>
+            Box::pin(async move { emitter.emit(event) }) as Pin<Box<dyn Future<Output = ()> + Send>>
         }))
     }
 
@@ -136,7 +136,7 @@ impl<Event: 'static> Effect<Event> {
                 for effect in effects {
                     effect.execute(&emitter).await;
                 }
-            }) as Pin<Box<dyn Future<Output=()> + Send>>
+            }) as Pin<Box<dyn Future<Output = ()> + Send>>
         }))
     }
 
@@ -200,7 +200,7 @@ impl<Event: 'static> Effect<Event> {
     pub fn from_async<F, Fut>(f: F) -> Self
     where
         F: FnOnce(Emitter<Event>) -> Fut + Send + 'static,
-        Fut: Future<Output=()> + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
     {
         Self(Box::new(move |emitter: &Emitter<Event>| {
             let future = f(emitter.clone());
@@ -210,14 +210,20 @@ impl<Event: 'static> Effect<Event> {
 }
 
 trait FnOnceBox<Event> {
-    fn call_box(self: Box<Self>, emitter: &Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>>;
+    fn call_box(
+        self: Box<Self>,
+        emitter: &Emitter<Event>,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
 }
 
 impl<F, Event> FnOnceBox<Event> for F
 where
     F: for<'a> FnOnce(&'a Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>>,
 {
-    fn call_box(self: Box<Self>, emitter: &Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+    fn call_box(
+        self: Box<Self>,
+        emitter: &Emitter<Event>,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
         (*self)(emitter)
     }
 }

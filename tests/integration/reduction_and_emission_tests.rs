@@ -1,5 +1,5 @@
+use super::{given_an_initial_effect, given_no_initial_event, TestEvent};
 use oxide_mvu::Effect;
-use super::{TestEvent, given_an_initial_effect, given_no_initial_event};
 
 #[test]
 fn given_no_initial_event_should_render_initial_props() {
@@ -13,8 +13,7 @@ fn given_no_initial_event_should_render_initial_props() {
 
 #[test]
 fn given_an_increment_effect_on_init_when_processed_should_render_again_with_incremented_count() {
-    let (mut driver, renderer) =
-        given_an_initial_effect(Effect::just(TestEvent::Increment));
+    let (mut driver, renderer) = given_an_initial_effect(Effect::just(TestEvent::Increment));
 
     driver.process_events();
 
@@ -25,16 +24,12 @@ fn given_an_increment_effect_on_init_when_processed_should_render_again_with_inc
 }
 
 #[test]
-fn given_two_batched_increment_effects_on_init_when_processed_should_render_a_third_time_with_incremented_count() {
-    let (mut driver, renderer) =
-        given_an_initial_effect(
-            Effect::batch(
-                vec![
-                    Effect::just(TestEvent::Increment),
-                    Effect::just(TestEvent::Increment),
-                ]
-            )
-        );
+fn given_two_batched_increment_effects_on_init_when_processed_should_render_a_third_time_with_incremented_count(
+) {
+    let (mut driver, renderer) = given_an_initial_effect(Effect::batch(vec![
+        Effect::just(TestEvent::Increment),
+        Effect::just(TestEvent::Increment),
+    ]));
 
     driver.process_events();
 

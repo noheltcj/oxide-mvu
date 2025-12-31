@@ -1,4 +1,4 @@
-use super::{TestEvent, given_no_initial_event, given_an_initial_effect};
+use super::{given_an_initial_effect, given_no_initial_event, TestEvent};
 
 #[test]
 fn given_no_initial_event_should_render_initial_props() {
