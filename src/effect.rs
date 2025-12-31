@@ -1,5 +1,9 @@
 //! Declarative effect system for describing deferred event processing.
 
+#[cfg(not(feature = "no_std"))]
+use std::future::Future;
+#[cfg(feature = "no_std")]
+use core::future::Future;
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
 #[cfg(feature = "no_std")]
@@ -115,6 +119,77 @@ impl<Event: 'static> Effect<Event> {
             for effect in &effects {
                 effect.execute(emitter);
             }
+        }))
+    }
+
+    /// Create an effect from an async function using a runtime-agnostic spawner.
+    ///
+    /// This allows you to use async/await syntax with any async runtime (tokio,
+    /// async-std, smol, etc.) by providing a spawner function that knows how to
+    /// execute futures on your chosen runtime.
+    ///
+    /// The async function receives a cloned `Emitter` that can be used to emit
+    /// events when the async work completes.
+    ///
+    /// # Arguments
+    ///
+    /// * `spawner` - A function that spawns the future on your async runtime
+    /// * `f` - An async function that receives an Emitter and returns a Future
+    ///
+    /// # Example with tokio
+    ///
+    /// ```rust,no_run
+    /// use oxide_mvu::Effect;
+    /// use std::time::Duration;
+    ///
+    /// #[derive(Clone)]
+    /// enum Event {
+    ///     FetchData,
+    ///     DataLoaded(String),
+    ///     DataFailed(String),
+    /// }
+    ///
+    /// async fn fetch_from_api() -> Result<String, String> {
+    ///     tokio::time::sleep(Duration::from_secs(1)).await;
+    ///     Ok("data from API".to_string())
+    /// }
+    ///
+    /// let effect = Effect::from_async_fn(
+    ///     |fut| { tokio::spawn(fut); },
+    ///     |emitter| async move {
+    ///         match fetch_from_api().await {
+    ///             Ok(data) => emitter.emit(Event::DataLoaded(data)),
+    ///             Err(err) => emitter.emit(Event::DataFailed(err)),
+    ///         }
+    ///     }
+    /// );
+    /// ```
+    ///
+    /// # Example with async-std
+    ///
+    /// ```rust,no_run
+    /// use oxide_mvu::Effect;
+    ///
+    /// #[derive(Clone)]
+    /// enum Event { TimerExpired }
+    ///
+    /// let effect = Effect::from_async(
+    ///     |fut| { async_std::task::spawn(fut); },
+    ///     |emitter| async move {
+    ///         async_std::task::sleep(std::time::Duration::from_secs(1)).await;
+    ///         emitter.emit(Event::TimerExpired);
+    ///     }
+    /// );
+    /// ```
+    pub fn from_async<F, Fut, S>(spawner: S, f: F) -> Self
+    where
+        F: Fn(Emitter<Event>) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        Self(Box::new(move |emitter: &Emitter<Event>| {
+            let future = f(emitter.clone());
+            // TODO: The spawner absolutely shouldn't be used here.
+            spawner(future);
         }))
     }
 }

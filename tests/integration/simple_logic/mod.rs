@@ -16,21 +16,23 @@ pub(crate) struct TestProps {
 }
 
 pub(crate) struct TestLogic {
-    pub(crate) initial_events: Vec<TestEvent>,
+    pub(crate) initial_effects: Box<dyn InitialEffectsDependency + Send>,
+    pub(crate) effects: Box<dyn EffectsDependency + Send>,
+}
+
+#[cfg_attr(test, mockall::automock)]
+pub(crate) trait InitialEffectsDependency {
+    fn on_init(&self) -> Effect<TestEvent>;
+}
+
+#[cfg_attr(test, mockall::automock)]
+pub(crate) trait EffectsDependency {
+    fn on_increment_side_effect(&self) -> Effect<TestEvent>;
 }
 
 impl MvuLogic<TestEvent, TestModel, TestProps> for TestLogic {
     fn init(&self, model: TestModel) -> (TestModel, Effect<TestEvent>) {
-        let effect = if self.initial_events.is_empty() {
-            Effect::none()
-        } else {
-            Effect::batch(
-                self.initial_events
-                    .iter()
-                    .map(|event| Effect::just(event.clone()))
-                    .collect(),
-            )
-        };
+        let effect = self.initial_effects.on_init();
         (model, effect)
     }
 
@@ -40,7 +42,7 @@ impl MvuLogic<TestEvent, TestModel, TestProps> for TestLogic {
                 let new_model = TestModel {
                     count: model.count + 1,
                 };
-                (new_model, Effect::none())
+                (new_model, self.effects.on_increment_side_effect())
             }
         }
     }
