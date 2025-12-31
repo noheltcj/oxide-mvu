@@ -11,7 +11,7 @@ use crate::Emitter;
 ///
 /// Effects allow you to describe asynchronous or deferred work that will
 /// produce events. They are returned from [`MvuLogic::init`](crate::MvuLogic::init)
-/// and [`MvuLogic::update`](crate::MvuLogic::update) alongside the new model state.
+/// and [`MvuLogic::update`](crate::MvuLogic::update) with the new model state.
 ///
 /// # Example
 ///
@@ -51,7 +51,7 @@ impl<Event: 'static> Effect<Event> {
         (self.0)(emitter);
     }
 
-    /// Create an effect just a single event.
+    /// Create an effect that just emits a single event.
     ///
     /// Useful for triggering immediate follow-up events.
     ///

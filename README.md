@@ -203,7 +203,7 @@ fn test_full_mvu_loop() {
 - **`renderer.with_renders()`**: Access all captured Props for assertions or to trigger callbacks.
 - **`driver.process_events()`**: Process all queued events until the queue is empty.
 
-See `tests/lib_test.rs` for complete examples.
+See the `tests` directory for complete examples.
 
 ## License
 

@@ -21,3 +21,7 @@ spin = { version = "0.10.0", features = ["portable_atomic"] }
 
 [dev-dependencies]
 oxide-mvu = { path = ".", features = ["testing"] }
+
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
