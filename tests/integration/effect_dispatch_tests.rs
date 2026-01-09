@@ -1,12 +1,9 @@
-use std::sync::Arc;
 use super::{build_integration_test, TestEvent};
 use oxide_mvu::Effect;
 
 #[test]
 fn given_no_initial_event_should_render_initial_props() {
-    let test = build_integration_test()
-        .given_no_initial_event()
-        .build();
+    let test = build_integration_test().given_no_initial_event().build();
 
     assert_eq!(test.renders.count(), 1);
     test.renders.with_renders(|renders| {
@@ -18,7 +15,7 @@ fn given_no_initial_event_should_render_initial_props() {
 fn given_an_on_increment_side_effect_when_increment_triggered_should_execute_side_effect() {
     let mut test = build_integration_test()
         .given_no_initial_event()
-        .given_on_increment_has_no_side_effect()
+        .given_a_noop_on_increment_side_effect()
         .build();
 
     // Trigger an increment event via props callback
@@ -29,8 +26,7 @@ fn given_an_on_increment_side_effect_when_increment_triggered_should_execute_sid
     // Process the increment event
     test.driver.process_events();
 
-    // Verify on_increment_side_effect
-    test.mock_effects_dependency.checkpoint();
+    test.verify_effects_dependency_checkpoint();
 
     // The on_increment_side_effect should have triggered another increment
     // So we should have 2 renders total:
@@ -44,17 +40,20 @@ fn given_an_on_increment_side_effect_when_increment_triggered_should_execute_sid
 }
 
 #[test]
-fn given_a_batch_of_effects_as_initial_effect_should_execute_all_effects() {
+fn given_a_batch_of_increment_effects_as_initial_effect_should_incrementally_update_count_and_trigger_side_effects(
+) {
     let mut test = build_integration_test()
         .given_an_initial_effect(Effect::batch(vec![
             Effect::just(TestEvent::Increment),
             Effect::just(TestEvent::Increment),
             Effect::just(TestEvent::Increment),
         ]))
-        .given_on_increment_has_no_side_effect()
+        .given_a_noop_on_increment_side_effect()
         .build();
 
     test.driver.process_events();
+
+    test.verify_initial_effects_dependency_checkpoint();
 
     // Should have 4 renders total:
     // 1. Initial render (count=0)

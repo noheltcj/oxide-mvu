@@ -3,9 +3,7 @@ use oxide_mvu::Effect;
 
 #[test]
 fn given_no_initial_event_should_render_initial_props() {
-    let test = build_integration_test()
-        .given_no_initial_event()
-        .build();
+    let test = build_integration_test().given_no_initial_event().build();
 
     assert_eq!(test.renders.count(), 1);
     test.renders.with_renders(|renders| {
@@ -17,7 +15,7 @@ fn given_no_initial_event_should_render_initial_props() {
 fn given_an_increment_effect_on_init_when_processed_should_render_again_with_incremented_count() {
     let mut test = build_integration_test()
         .given_an_initial_effect(Effect::just(TestEvent::Increment))
-        .given_on_increment_has_no_side_effect()
+        .given_a_noop_on_increment_side_effect()
         .build();
 
     test.driver.process_events();
@@ -36,7 +34,7 @@ fn given_two_batched_increment_effects_on_init_when_processed_should_render_a_th
             Effect::just(TestEvent::Increment),
             Effect::just(TestEvent::Increment),
         ]))
-        .given_on_increment_has_no_side_effect()
+        .given_a_noop_on_increment_side_effect()
         .build();
 
     test.driver.process_events();
@@ -51,7 +49,7 @@ fn given_two_batched_increment_effects_on_init_when_processed_should_render_a_th
 fn given_no_initial_event_when_props_callback_invoked_should_render_again() {
     let mut test = build_integration_test()
         .given_no_initial_event()
-        .given_on_increment_has_no_side_effect()
+        .given_a_noop_on_increment_side_effect()
         .build();
 
     test.renders.with_renders(|renders| {

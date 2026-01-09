@@ -1,22 +1,36 @@
 mod simple_logic;
 
-use std::sync::Arc;
 use oxide_mvu::{create_test_spawner, Effect, TestMvuDriver, TestMvuRuntime, TestRenderer};
 pub(crate) use simple_logic::*;
+use std::sync::{Arc, Mutex};
 
 mod effect_dispatch_tests;
 mod reduction_and_emission_tests;
 
 pub(crate) struct IntegrationTestStubbing {
     mock_initial_effects_dependency: MockInitialEffectsDependency,
-    mock_effects_dependency: MockEffectsDependency
+    mock_effects_dependency: MockEffectsDependency,
 }
 
 pub(crate) struct IntegrationTestHarness {
-    driver: TestMvuDriver<TestEvent, TestModel, TestProps>,
-    renders: TestRenderer<TestProps>,
-    mock_initial_effects_dependency: Arc<MockInitialEffectsDependency>,
-    mock_effects_dependency: Arc<MockEffectsDependency>
+    pub(crate) driver: TestMvuDriver<TestEvent, TestModel, TestProps>,
+    pub(crate) renders: TestRenderer<TestProps>,
+    pub(crate) mock_initial_effects_dependency: Arc<Mutex<MockInitialEffectsDependency>>,
+    pub(crate) mock_effects_dependency: Arc<Mutex<MockEffectsDependency>>,
+}
+
+struct ArcMutexWrapper<T: ?Sized>(Arc<Mutex<T>>);
+
+impl InitialEffectsDependency for ArcMutexWrapper<MockInitialEffectsDependency> {
+    fn on_init(&self) -> Effect<TestEvent> {
+        self.0.lock().unwrap().on_init()
+    }
+}
+
+impl EffectsDependency for ArcMutexWrapper<MockEffectsDependency> {
+    fn on_increment_side_effect(&self) -> Effect<TestEvent> {
+        self.0.lock().unwrap().on_increment_side_effect()
+    }
 }
 
 impl IntegrationTestStubbing {
@@ -31,23 +45,15 @@ impl IntegrationTestStubbing {
     pub(crate) fn given_no_initial_event(mut self) -> Self {
         self.mock_initial_effects_dependency
             .expect_on_init()
-            .return_once(|| Effect::none());
+            .return_once(Effect::none);
 
         self
     }
 
-    pub(crate) fn given_on_increment_effect_will_succeed(mut self) -> Self {
+    pub(crate) fn given_a_noop_on_increment_side_effect(mut self) -> Self {
         self.mock_effects_dependency
             .expect_on_increment_side_effect()
-            .returning(|| Effect::just(TestEvent::Increment));
-
-        self
-    }
-
-    pub(crate) fn given_on_increment_has_no_side_effect(mut self) -> Self {
-        self.mock_effects_dependency
-            .expect_on_increment_side_effect()
-            .returning(|| Effect::none());
+            .returning(Effect::none);
 
         self
     }
@@ -60,12 +66,12 @@ impl IntegrationTestStubbing {
         let renderer = TestRenderer::new();
         let model = TestModel { count: 0 };
 
-        let mock_initial_effects_arc = Arc::new(self.mock_initial_effects_dependency);
-        let mock_effects_arc = Arc::new(self.mock_effects_dependency);
+        let mock_initial_effects_arc = Arc::new(Mutex::new(self.mock_initial_effects_dependency));
+        let mock_effects_arc = Arc::new(Mutex::new(self.mock_effects_dependency));
 
         let logic = Box::new(TestLogic {
-            initial_effects: Box::new(*mock_initial_effects_arc.clone()),
-            effects: Box::new(*mock_effects_arc.clone()),
+            initial_effects: Box::new(ArcMutexWrapper(mock_initial_effects_arc.clone())),
+            effects: Box::new(ArcMutexWrapper(mock_effects_arc.clone())),
         });
 
         let runtime = TestMvuRuntime::new(model, logic, renderer.boxed(), create_test_spawner());
@@ -81,12 +87,21 @@ impl IntegrationTestStubbing {
 }
 
 impl IntegrationTestHarness {
+    pub(crate) fn verify_initial_effects_dependency_checkpoint(&self) {
+        self.mock_initial_effects_dependency
+            .lock()
+            .unwrap()
+            .checkpoint();
+    }
 
+    pub(crate) fn verify_effects_dependency_checkpoint(&self) {
+        self.mock_effects_dependency.lock().unwrap().checkpoint();
+    }
 }
 
 pub(crate) fn build_integration_test() -> IntegrationTestStubbing {
     IntegrationTestStubbing {
         mock_initial_effects_dependency: MockInitialEffectsDependency::new(),
-        mock_effects_dependency: MockEffectsDependency::new()
+        mock_effects_dependency: MockEffectsDependency::new(),
     }
 }
