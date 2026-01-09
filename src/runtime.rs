@@ -8,7 +8,10 @@ use alloc::vec::Vec;
 use portable_atomic_util::Arc;
 use spin::Mutex;
 
-use crate::{Effect, Emitter, MvuLogic, Renderer, Spawner};
+use crate::{Emitter, MvuLogic, Renderer, Spawner};
+
+#[cfg(any(test, feature = "testing"))]
+use crate::Effect;
 
 /// Internal state for the MVU runtime.
 struct RuntimeState<Event: Send, Model: Clone + Send> {
