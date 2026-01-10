@@ -4,14 +4,44 @@
 use alloc::boxed::Box;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+#[cfg(feature = "no_std")]
+use core::future::Future;
+#[cfg(feature = "no_std")]
+use core::pin::Pin;
+#[cfg(not(feature = "no_std"))]
+use std::future::Future;
+#[cfg(not(feature = "no_std"))]
+use std::pin::Pin;
 
 use portable_atomic_util::Arc;
 use spin::Mutex;
 
-use crate::{Emitter, MvuLogic, Renderer, Spawner};
+use crate::{Emitter, MvuLogic, Renderer};
 
 #[cfg(any(test, feature = "testing"))]
 use crate::Effect;
+
+/// A spawner trait for executing futures on an async runtime.
+///
+/// This abstraction allows you to use whatever concurrency model you want (tokio, async-std, embassy, etc.).
+///
+/// Function pointers automatically implement this trait.
+pub trait Spawner: Send + Sync {
+    /// Spawn a future on the async runtime.
+    fn spawn(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>);
+}
+
+/// Implement Spawner for any callable type that matches the signature.
+///
+/// This includes function pointers, closures, and function items.
+impl<F> Spawner for F
+where
+    F: Fn(Pin<Box<dyn Future<Output = ()> + Send>>) + Send + Sync,
+{
+    fn spawn(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
+        self(future)
+    }
+}
 
 /// Internal state for the MVU runtime.
 struct RuntimeState<Event: Send, Model: Clone + Send> {
@@ -34,16 +64,40 @@ struct RuntimeState<Event: Send, Model: Clone + Send> {
 /// For testing with manual control, use [`TestMvuRuntime`] with a [`crate::TestRenderer`].
 ///
 /// See the [crate-level documentation](crate) for a complete example.
-pub struct MvuRuntime<Event: Send, Model: Clone + Send, Props> {
-    logic: Box<dyn MvuLogic<Event, Model, Props> + Send>,
-    renderer: Box<dyn Renderer<Props> + Send>,
+///
+/// # Type Parameters
+///
+/// * `Event` - The event type for your application
+/// * `Model` - The model/state type for your application
+/// * `Props` - The props type produced by the view function
+/// * `Logic` - The logic implementation type (implements [`MvuLogic`])
+/// * `Render` - The renderer implementation type (implements [`Renderer`])
+/// * `Spawn` - The spawner implementation type (implements [`Spawner`])
+pub struct MvuRuntime<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: Send,
+    Model: Clone + Send,
+    Logic: MvuLogic<Event, Model, Props> + Send,
+    Render: Renderer<Props> + Send,
+    Spawn: Spawner,
+{
+    logic: Logic,
+    renderer: Render,
     state: Arc<Mutex<RuntimeState<Event, Model>>>,
     emitter: Emitter<Event>,
-    spawner: Spawner,
+    spawner: Spawn,
+    _props: core::marker::PhantomData<Props>,
 }
 
-impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
-    MvuRuntime<Event, Model, Props>
+impl<Event, Model, Props, Logic, Render, Spawn>
+    MvuRuntime<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: Send + 'static,
+    Model: Clone + Send + 'static,
+    Props: 'static,
+    Logic: MvuLogic<Event, Model, Props> + Send,
+    Render: Renderer<Props> + Send,
+    Spawn: Spawner,
 {
     /// Create a new runtime.
     ///
@@ -54,13 +108,8 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
     /// * `init_model` - The initial state
     /// * `logic` - Application logic implementing MvuLogic
     /// * `renderer` - Platform rendering implementation for rendering Props
-    /// * `spawner` - Function to spawn async effects on your chosen runtime
-    pub fn new(
-        init_model: Model,
-        logic: Box<dyn MvuLogic<Event, Model, Props> + Send>,
-        renderer: Box<dyn Renderer<Props> + Send>,
-        spawner: Spawner,
-    ) -> Self {
+    /// * `spawner` - Spawner to execute async effects on your chosen runtime
+    pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
         // Create state and emitter that enqueues to the state's event queue
         let state = Arc::new(Mutex::new(RuntimeState {
             model: init_model,
@@ -78,6 +127,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
             state,
             emitter,
             spawner,
+            _props: core::marker::PhantomData,
         }
     }
 
@@ -111,7 +161,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
         // Execute initial effect by spawning it
         let emitter = self.emitter.clone();
         let future = init_effect.execute(&emitter);
-        (self.spawner)(Box::pin(future));
+        self.spawner.spawn(Box::pin(future));
     }
 
     #[cfg(any(test, feature = "testing"))]
@@ -131,7 +181,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
         // Execute the effect (which may enqueue more events)
         let emitter = self.emitter.clone();
         let future = effect.execute(&emitter);
-        (self.spawner)(Box::pin(future));
+        self.spawner.spawn(Box::pin(future));
 
         // Process any newly queued events
         self.process_queued_events()
@@ -173,16 +223,25 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
 }
 
 #[cfg(any(test, feature = "testing"))]
+/// Test spawner function that executes futures synchronously.
+///
+/// This blocks on the future immediately rather than spawning it on an async runtime.
+pub fn test_spawner_fn(fut: Pin<Box<dyn Future<Output = ()> + Send>>) {
+    // Execute the future synchronously for deterministic testing
+    futures::executor::block_on(fut);
+}
+
+#[cfg(any(test, feature = "testing"))]
 /// Creates a test spawner that executes futures synchronously.
 ///
 /// This is useful for testing - it blocks on the future immediately rather
 /// than spawning it on an async runtime. Use this with [`TestMvuRuntime`]
 /// or [`MvuRuntime`] in test scenarios.
-pub fn create_test_spawner() -> Spawner {
-    Box::new(|fut| {
-        // Execute the future synchronously for deterministic testing
-        futures::executor::block_on(fut);
-    })
+///
+/// Returns a function pointer that can be passed directly to runtime constructors
+/// without heap allocation.
+pub fn create_test_spawner() -> fn(Pin<Box<dyn Future<Output = ()> + Send>>) {
+    test_spawner_fn
 }
 
 #[cfg(any(test, feature = "testing"))]
@@ -194,13 +253,28 @@ pub fn create_test_spawner() -> Spawner {
 /// emit events and process the event queue for precise control in tests.
 ///
 /// See [`TestMvuRuntime`] for usage.
-pub struct TestMvuDriver<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> {
-    _runtime: MvuRuntime<Event, Model, Props>,
+pub struct TestMvuDriver<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: Send + 'static,
+    Model: Clone + Send + 'static,
+    Props: 'static,
+    Logic: MvuLogic<Event, Model, Props> + Send,
+    Render: Renderer<Props> + Send,
+    Spawn: Spawner,
+{
+    _runtime: MvuRuntime<Event, Model, Props, Logic, Render, Spawn>,
 }
 
 #[cfg(any(test, feature = "testing"))]
-impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
-    TestMvuDriver<Event, Model, Props>
+impl<Event, Model, Props, Logic, Render, Spawn>
+    TestMvuDriver<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: Send + 'static,
+    Model: Clone + Send + 'static,
+    Props: 'static,
+    Logic: MvuLogic<Event, Model, Props> + Send,
+    Render: Renderer<Props> + Send,
+    Spawn: Spawner,
 {
     /// Process all queued events.
     ///
@@ -246,20 +320,35 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
 ///
 /// let runtime = TestMvuRuntime::new(
 ///     Model { count: 0 },
-///     Box::new(MyApp),
-///     Box::new(TestRenderer),
+///     MyApp,
+///     TestRenderer,
 ///     create_test_spawner()
 /// );
 /// let mut driver = runtime.run();
 /// driver.process_events(); // Manually process events
 /// ```
-pub struct TestMvuRuntime<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static> {
-    runtime: MvuRuntime<Event, Model, Props>,
+pub struct TestMvuRuntime<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: Send + 'static,
+    Model: Clone + Send + 'static,
+    Props: 'static,
+    Logic: MvuLogic<Event, Model, Props> + Send,
+    Render: Renderer<Props> + Send,
+    Spawn: Spawner,
+{
+    runtime: MvuRuntime<Event, Model, Props, Logic, Render, Spawn>,
 }
 
 #[cfg(any(test, feature = "testing"))]
-impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
-    TestMvuRuntime<Event, Model, Props>
+impl<Event, Model, Props, Logic, Render, Spawn>
+    TestMvuRuntime<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: Send + 'static,
+    Model: Clone + Send + 'static,
+    Props: 'static,
+    Logic: MvuLogic<Event, Model, Props> + Send,
+    Render: Renderer<Props> + Send,
+    Spawn: Spawner,
 {
     /// Create a new test runtime.
     ///
@@ -270,13 +359,8 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
     /// * `init_model` - The initial state
     /// * `logic` - Application logic implementing MvuLogic
     /// * `renderer` - Platform rendering implementation for rendering Props
-    /// * `spawner` - Function to spawn async effects on your chosen runtime
-    pub fn new(
-        init_model: Model,
-        logic: Box<dyn MvuLogic<Event, Model, Props> + Send>,
-        renderer: Box<dyn Renderer<Props> + Send>,
-        spawner: Spawner,
-    ) -> Self {
+    /// * `spawner` - Spawner to execute async effects on your chosen runtime
+    pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
         // Create state and emitter that enqueues to the state's event queue
         let state = Arc::new(Mutex::new(RuntimeState {
             model: init_model,
@@ -295,6 +379,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
                 state,
                 emitter,
                 spawner,
+                _props: core::marker::PhantomData,
             },
         }
     }
@@ -303,7 +388,7 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
     ///
     /// This processes initial effects and renders the initial state, then returns
     /// a [`TestMvuDriver`] that provides manual control over event processing.
-    pub fn run(mut self) -> TestMvuDriver<Event, Model, Props> {
+    pub fn run(mut self) -> TestMvuDriver<Event, Model, Props, Logic, Render, Spawn> {
         // Initialize the model and get initial effects
         let (init_model, init_effect) = {
             let mut runtime_state = self.runtime.state.lock();
@@ -328,9 +413,8 @@ impl<Event: Send + 'static, Model: Clone + Send + 'static, Props: 'static>
         // Execute initial effect by spawning it
         {
             let emitter = self.runtime.emitter.clone();
-            let spawner = &self.runtime.spawner;
             let future = init_effect.execute(&emitter);
-            spawner(Box::pin(future));
+            self.runtime.spawner.spawn(Box::pin(future));
         }
 
         TestMvuDriver {

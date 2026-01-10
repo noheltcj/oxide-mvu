@@ -4,21 +4,11 @@
 use alloc::boxed::Box;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-#[cfg(feature = "no_std")]
+
 use core::future::Future;
-#[cfg(feature = "no_std")]
 use core::pin::Pin;
-#[cfg(not(feature = "no_std"))]
-use std::future::Future;
-#[cfg(not(feature = "no_std"))]
-use std::pin::Pin;
 
 use crate::Emitter;
-
-/// A spawner function that executes futures on an async runtime.
-///
-/// This abstraction allows you to use whatever concurrency model you want (tokio, async-std, embassy, etc.).
-pub type Spawner = Box<dyn Fn(Pin<Box<dyn Future<Output = ()> + Send>>) + Send + Sync>;
 
 /// Declarative description of events to be processed.
 ///

@@ -1,7 +1,8 @@
 mod simple_logic;
 
-use oxide_mvu::{create_test_spawner, Effect, TestMvuDriver, TestMvuRuntime, TestRenderer};
 pub(crate) use simple_logic::*;
+
+use oxide_mvu::{create_test_spawner, Effect, TestMvuDriver, TestMvuRuntime, TestRenderer};
 use std::sync::{Arc, Mutex};
 
 mod effect_dispatch_tests;
@@ -12,8 +13,13 @@ pub(crate) struct IntegrationTestStubbing {
     mock_effects_dependency: MockEffectsDependency,
 }
 
+pub(crate) type TestSpawner = fn(std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>);
+
+pub(crate) type TestDriver =
+    TestMvuDriver<TestEvent, TestModel, TestProps, TestLogic, TestRenderer<TestProps>, TestSpawner>;
+
 pub(crate) struct IntegrationTestHarness {
-    pub(crate) driver: TestMvuDriver<TestEvent, TestModel, TestProps>,
+    pub(crate) driver: TestDriver,
     pub(crate) renders: TestRenderer<TestProps>,
     pub(crate) mock_initial_effects_dependency: Arc<Mutex<MockInitialEffectsDependency>>,
     pub(crate) mock_effects_dependency: Arc<Mutex<MockEffectsDependency>>,
@@ -69,12 +75,12 @@ impl IntegrationTestStubbing {
         let mock_initial_effects_arc = Arc::new(Mutex::new(self.mock_initial_effects_dependency));
         let mock_effects_arc = Arc::new(Mutex::new(self.mock_effects_dependency));
 
-        let logic = Box::new(TestLogic {
+        let logic = TestLogic {
             initial_effects: Box::new(ArcMutexWrapper(mock_initial_effects_arc.clone())),
             effects: Box::new(ArcMutexWrapper(mock_effects_arc.clone())),
-        });
+        };
 
-        let runtime = TestMvuRuntime::new(model, logic, renderer.boxed(), create_test_spawner());
+        let runtime = TestMvuRuntime::new(model, logic, renderer.clone(), create_test_spawner());
         let driver = runtime.run();
 
         IntegrationTestHarness {

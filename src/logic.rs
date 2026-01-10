@@ -10,7 +10,7 @@ use crate::{Effect, Emitter};
 /// - [`view`](Self::view): Derive Props from Model with event emitter capability
 ///
 /// See the [crate-level documentation](crate) for a complete example.
-pub trait MvuLogic<Event: Send, Model: Send, Props> {
+pub trait MvuLogic<Event: Send, Model, Props> {
     /// Initialize the runtime from an initial model with effects and state changes as needed.
     ///
     /// This is called once when the runtime starts. Use it to set up initial

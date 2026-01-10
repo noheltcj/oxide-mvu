@@ -86,8 +86,8 @@ pub trait Renderer<Props> {
 /// // Construct a TestMvuRuntime using the renderer
 /// let runtime = TestMvuRuntime::new(
 ///     Model { count: 0 },
-///     Box::new(Logic),
-///     renderer.boxed(),
+///     Logic,
+///     renderer.clone(),
 ///     create_test_spawner()
 /// );
 ///
@@ -109,6 +109,22 @@ struct InternalTestRenderer<Props> {
 
 #[cfg(any(test, feature = "testing"))]
 impl<Props> Renderer<Props> for InternalTestRenderer<Props> {
+    fn render(&mut self, props: Props) {
+        self.renders.lock().push(props);
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl<Props> Clone for TestRenderer<Props> {
+    fn clone(&self) -> Self {
+        Self {
+            renders: self.renders.clone(),
+        }
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl<Props> Renderer<Props> for TestRenderer<Props> {
     fn render(&mut self, props: Props) {
         self.renders.lock().push(props);
     }
