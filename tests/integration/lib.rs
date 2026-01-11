@@ -16,8 +16,14 @@ pub(crate) struct IntegrationTestStubbing {
     mock_effects_dependency: MockEffectsDependency,
 }
 
-pub(crate) type TestDriver =
-    TestMvuDriver<TestEvent, TestModel, TestProps, TestLogic, TestRenderer<TestProps>, fn(Pin<Box<dyn Future<Output = ()> + Send>>)>;
+pub(crate) type TestDriver = TestMvuDriver<
+    TestEvent,
+    TestModel,
+    TestProps,
+    TestLogic,
+    TestRenderer<TestProps>,
+    fn(Pin<Box<dyn Future<Output = ()> + Send>>),
+>;
 
 pub(crate) struct IntegrationTestHarness {
     pub(crate) driver: TestDriver,

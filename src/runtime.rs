@@ -366,13 +366,9 @@ where
     /// This processes initial effects and renders the initial state, then returns
     /// a [`TestMvuDriver`] that provides manual control over event processing.
     pub fn run(mut self) -> TestMvuDriver<Event, Model, Props, Logic, Render, Spawn> {
-        let (init_model, init_effect) = self.runtime.logic.init(
-            self.runtime.model.clone()
-        );
+        let (init_model, init_effect) = self.runtime.logic.init(self.runtime.model.clone());
 
-        let initial_props = {
-            self.runtime.logic.view(&init_model, &self.runtime.emitter)
-        };
+        let initial_props = { self.runtime.logic.view(&init_model, &self.runtime.emitter) };
 
         self.runtime.renderer.render(initial_props);
 

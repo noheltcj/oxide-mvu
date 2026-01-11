@@ -99,7 +99,6 @@ pub struct TestRenderer<Props> {
     renders: Arc<Mutex<Vec<Props>>>,
 }
 
-
 #[cfg(any(test, feature = "testing"))]
 impl<Props> Clone for TestRenderer<Props> {
     fn clone(&self) -> Self {
