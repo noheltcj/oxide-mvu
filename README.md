@@ -4,7 +4,7 @@ A lightweight Model-View-Update (MVU) runtime framework for Rust with `no_std` s
 
 ## Overview
 
-__(Note that this framework is not yet ready for production, and APIs should not be considered stable. Many of the current interfaces are an assault on the eyes as of v0.2.0)__
+__(Note that this framework is not yet ready for production, and APIs should not be considered stable)__
 
 `oxide-mvu` implements the MVU pattern for building predictable, testable applications in Rust. The framework is powerful enough
 to be a good choice for most applications, but will always evolve with support for no_std, low-memory, single-cpu, embedded systems as a baseline.
@@ -110,41 +110,38 @@ impl Renderer<Props> for MyRenderer {
 
 ### Create a Spawner
 
-The runtime needs a spawner function to execute async effects. The spawner is framework-agnostic,
-allowing you to use any async runtime (tokio, async-std, smol, etc.):
+The runtime needs a spawner to execute async effects. The spawner is framework-agnostic,
+allowing you to use any async runtime (tokio, async-std, smol, etc.). Any function or
+closure that implements the `Spawner` trait will work:
 
 #### Using tokio:
 ```rust
-use oxide_mvu::Spawner;
-
-let spawner: Spawner = Box::new(|fut| {
+let spawner = |fut| {
     tokio::spawn(fut);
-});
+};
 ```
 
 #### Using async-std:
 ```rust
-use oxide_mvu::Spawner;
-
-let spawner: Spawner = Box::new(|fut| {
+let spawner = |fut| {
     async_std::task::spawn(fut);
-});
+};
 ```
 
 ### Run the application
 
 ```rust
-use oxide_mvu::{MvuRuntime, Spawner};
+use oxide_mvu::MvuRuntime;
 
 fn main() {
     let model = Model { count: 0 };
-    let logic = Box::new(Logic);
-    let renderer = Box::new(MyRenderer);
+    let logic = Logic;
+    let renderer = MyRenderer;
 
     // Create a spawner for your chosen async runtime
-    let spawner: Spawner = Box::new(|fut| {
+    let spawner = |fut| {
         tokio::spawn(fut);
-    });
+    };
 
     let runtime = MvuRuntime::new(model, logic, renderer, spawner);
     runtime.run();
@@ -188,7 +185,7 @@ fn test_increment() {
 Use `TestMvuRuntime` and `TestRenderer` to test the full MVU loop:
 
 ```rust
-use oxide_mvu::{TestMvuRuntime, TestRenderer, TestMvuDriver, create_test_spawner};
+use oxide_mvu::{TestMvuRuntime, TestRenderer, create_test_spawner};
 
 #[test]
 fn test_full_mvu_loop() {
@@ -198,8 +195,8 @@ fn test_full_mvu_loop() {
     // Create runtime with test helpers
     let runtime = TestMvuRuntime::new(
         Model { count: 0 },
-        Box::new(Logic),
-        renderer.boxed(),
+        Logic,
+        renderer.clone(),
         create_test_spawner(),
     );
 
@@ -220,7 +217,7 @@ fn test_full_mvu_loop() {
     // Manually process events
     driver.process_events();
 
-    // Verify updated render
+    // Verify a second render occurred
     assert_eq!(renderer.count(), 2);
     renderer.with_renders(|renders| {
         assert_eq!(renders[1].count, 1);
@@ -231,7 +228,7 @@ fn test_full_mvu_loop() {
 ### Key Testing Concepts
 
 - **`TestMvuRuntime`**: Unlike `MvuRuntime`, events are not automatically processed. You must call `driver.process_events()` to manually drive the event loop.
-- **`TestRenderer::boxed()`**: Returns a boxed renderer while keeping a handle for assertions.
+- **`TestRenderer`**: Captures all rendered Props, allowing you to verify the runtime's output and trigger callbacks.
 - **`renderer.with_renders()`**: Access all captured Props for assertions or to trigger callbacks.
 - **`driver.process_events()`**: Process all queued events until the queue is empty.
 - **`create_test_spawner()`**: Creates a spawner that executes effects synchronously for deterministic testing.
