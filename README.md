@@ -1,6 +1,14 @@
 # oxide-mvu
 
+[![CI](https://github.com/noheltcj/oxide-mvu/workflows/CI/badge.svg)](https://github.com/noheltcj/oxide-mvu/actions)
+[![Crates.io](https://img.shields.io/crates/v/oxide-mvu.svg)](https://crates.io/crates/oxide-mvu)
+[![Documentation](https://docs.rs/oxide-mvu/badge.svg)](https://docs.rs/oxide-mvu)
+[![License](https://img.shields.io/crates/l/oxide-mvu.svg)](LICENSE)
+[![Downloads](https://img.shields.io/crates/d/oxide-mvu.svg)](https://crates.io/crates/oxide-mvu)
+
 A lightweight Model-View-Update (MVU) runtime framework for Rust with `no_std` support.
+
+[Documentation](https://docs.rs/oxide-mvu) | [Crates.io](https://crates.io/crates/oxide-mvu) | [Repository](https://github.com/noheltcj/oxide-mvu) | [Examples](https://github.com/noheltcj/oxide-mvu/tree/main/tests)
 
 ## Overview
 
