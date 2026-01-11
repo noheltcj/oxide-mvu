@@ -11,12 +11,19 @@
 //! use oxide_mvu::{Emitter, Effect, MvuLogic, MvuRuntime, Renderer};
 //!
 //! #[derive(Clone)]
-//! enum Event { AccumulateClicked }
+//! enum Event {
+//!     AccumulateClicked,
+//! }
 //!
 //! #[derive(Clone)]
-//! struct Model { count: i32 }
+//! struct Model {
+//!     count: i32,
+//! }
 //!
-//! struct Props { count: i32, on_accumulate_click: Box<dyn Fn()> }
+//! struct Props {
+//!     count: i32,
+//!     on_accumulate_click: Box<dyn Fn()>,
+//! }
 //!
 //! struct MyLogic;
 //!
@@ -41,30 +48,45 @@
 //!         let emitter = emitter.clone();
 //!         Props {
 //!             count: model.count,
-//!             on_accumulate_click: Box::new(move || emitter.emit(Event::AccumulateClicked))
+//!             on_accumulate_click: Box::new(move || {
+//!                 emitter.emit(Event::AccumulateClicked)
+//!             }),
 //!         }
 //!     }
 //! }
 //!
 //! struct MyRenderer;
+//!
 //! impl Renderer<Props> for MyRenderer {
 //!     fn render(&mut self, _props: Props) {}
 //! }
 //!
-//! // Create a spawner for your async runtime (no heap allocation needed)
-//! let spawner = |_fut| {
-//!     // Spawn the future on your chosen runtime
-//!     // e.g., tokio::spawn(fut); or async_std::task::spawn(fut);
-//! };
+//! async fn main_async() {
+//!     // Create a spawner for your async runtime.
+//!     // This is how `Effect`s are executed.
+//!     let spawner = |fut| {
+//!         // Spawn the future on your chosen runtime.
+//!         // Examples:
+//!         // tokio::spawn(fut);
+//!         // async_std::task::spawn(fut);
+//!         let _ = fut;
+//!     };
 //!
-//! let runtime = MvuRuntime::new(
-//!     Model { count: 0 },
-//!     MyLogic,
-//!     MyRenderer,
-//!     spawner
-//! );
-//! runtime.run();
+//!     let runtime = MvuRuntime::new(
+//!         Model { count: 0 },
+//!         MyLogic,
+//!         MyRenderer,
+//!         spawner,
+//!     );
+//!
+//!     // `run()` returns a Future representing the event loop.
+//!     // It must be awaited inside an async context.
+//!     runtime.run().await;
+//! }
 //! ```
+//!
+//! In a real application, `main_async` would be executed by your async runtime
+//! (e.g. via `#[tokio::main]`, `async_std::main`, or an embedded executor).
 
 #[cfg(feature = "no_std")]
 extern crate alloc;

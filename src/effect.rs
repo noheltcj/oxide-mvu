@@ -39,9 +39,9 @@ use crate::Emitter;
 /// // No side effects
 /// let effect: Effect<Event> = Effect::none();
 /// ```
-pub struct Effect<Event>(Box<dyn FnOnceBox<Event> + Send>);
+pub struct Effect<Event: Send>(Box<dyn FnOnceBox<Event> + Send>);
 
-impl<Event: 'static> Effect<Event> {
+impl<Event: Send + 'static> Effect<Event> {
     /// Execute the effect, consuming it and returning a future.
     ///
     /// The returned future will be spawned on your async runtime using the provided spawner.
@@ -53,7 +53,7 @@ impl<Event: 'static> Effect<Event> {
     ///
     /// This is private - use [`Effect::none()`] instead.
     fn new() -> Self {
-        fn empty_fn<Event>(_: &Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+        fn empty_fn<Event: Send>(_: &Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>> {
             Box::pin(async {})
         }
         Self(Box::new(empty_fn))
@@ -199,14 +199,14 @@ impl<Event: 'static> Effect<Event> {
     }
 }
 
-trait FnOnceBox<Event> {
+trait FnOnceBox<Event: Send> {
     fn call_box(
         self: Box<Self>,
         emitter: &Emitter<Event>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
 }
 
-impl<F, Event> FnOnceBox<Event> for F
+impl<F, Event: Send> FnOnceBox<Event> for F
 where
     F: for<'a> FnOnce(&'a Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>>,
 {

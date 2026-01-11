@@ -1,18 +1,14 @@
 //! Event emitter for embedding callbacks in Props.
 
-#[cfg(feature = "no_std")]
-use alloc::boxed::Box;
-
-use portable_atomic_util::Arc;
-use spin::Mutex;
+use flume::Sender;
 
 /// Event emitter that can be embedded in Props.
 ///
 /// Clone this handle to create callbacks in your Props that can trigger
 /// events when invoked (e.g., by user interaction).
 ///
-/// `Emitter` uses interior mutability via `Arc<Mutex<...>>`, making it
-/// cheap to clone (just an atomic reference count increment) and thread-safe.
+/// `Emitter` wraps a lock-free channel sender, making it cheap to clone
+/// and thread-safe without any locking overhead.
 ///
 /// # Example
 ///
@@ -59,29 +55,25 @@ use spin::Mutex;
 ///     }
 /// }
 /// ```
-#[allow(clippy::type_complexity)]
-pub struct Emitter<Event>(pub(crate) Arc<Mutex<Box<dyn FnMut(Event) + Send + 'static>>>);
+pub struct Emitter<Event: Send>(pub(crate) Sender<Event>);
 
-impl<Event> Clone for Emitter<Event> {
+impl<Event: Send> Clone for Emitter<Event> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<Event> Emitter<Event> {
-    /// Create a new emitter from a callback function.
-    ///
-    /// The callback will be invoked when [`emit`](Self::emit) is used.
-    pub fn new<F: FnMut(Event) + Send + 'static>(f: F) -> Self {
-        Self(Arc::new(Mutex::new(Box::new(f))))
+impl<Event: Send> Emitter<Event> {
+    /// Create a new emitter from a channel sender.
+    pub(crate) fn new(sender: Sender<Event>) -> Self {
+        Self(sender)
     }
 
     /// Emit an event.
     ///
     /// This queues the event for processing by the runtime. Multiple threads
-    /// can safely call this method concurrently.
+    /// can safely call this method concurrently via the lock-free channel.
     pub fn emit(&self, event: Event) {
-        let mut f = self.0.lock();
-        f(event);
+        self.0.send(event).ok();
     }
 }
