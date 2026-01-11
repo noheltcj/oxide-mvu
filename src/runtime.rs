@@ -6,7 +6,7 @@ use alloc::boxed::Box;
 use core::future::Future;
 use core::pin::Pin;
 
-use crossbeam_channel::Receiver;
+use flume::Receiver;
 
 use crate::{Emitter, MvuLogic, Renderer};
 
@@ -94,7 +94,7 @@ where
     /// * `renderer` - Platform rendering implementation for rendering Props
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
     pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
-        let (event_sender, event_receiver) = crossbeam_channel::unbounded();
+        let (event_sender, event_receiver) = flume::unbounded();
         let emitter = Emitter::new(event_sender);
 
         MvuRuntime {
@@ -120,7 +120,7 @@ where
     ///
     /// Events can be emitted from any thread via the Emitter, but are always processed
     /// sequentially on the thread where this future is awaited/polled.
-    pub async fn run(&mut self) {
+    pub async fn run(mut self) {
         let (init_model, init_effect) = self.logic.init(self.model.clone());
 
         let initial_props = {
@@ -136,11 +136,8 @@ where
         self.spawner.spawn(Box::pin(future));
 
         // Event processing loop
-        loop {
-            match self.event_receiver.recv() {
-                Ok(event) => self.step(event),
-                Err(_) => break, // Channel closed
-            }
+        while let Ok(event) = self.event_receiver.recv_async().await {
+            self.step(event)
         }
     }
 
@@ -202,7 +199,7 @@ where
     Render: Renderer<Props>,
     Spawn: Spawner,
 {
-    _runtime: MvuRuntime<Event, Model, Props, Logic, Render, Spawn>,
+    _runtime: TestMvuRuntime<Event, Model, Props, Logic, Render, Spawn>,
 }
 
 #[cfg(any(test, feature = "testing"))]
@@ -302,7 +299,7 @@ where
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
     pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
         // Create unbounded channel for event queue
-        let (event_sender, event_receiver) = crossbeam_channel::unbounded();
+        let (event_sender, event_receiver) = flume::unbounded();
 
         TestMvuRuntime {
             runtime: MvuRuntime {
@@ -332,9 +329,7 @@ where
         let future = init_effect.execute(&self.runtime.emitter);
         self.runtime.spawner.spawn(Box::pin(future));
 
-        TestMvuDriver {
-            _runtime: self.runtime,
-        }
+        TestMvuDriver { _runtime: self }
     }
 
     /// Process all queued events (for testing).

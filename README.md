@@ -18,6 +18,8 @@ Oxide is intended to clarify the management of state in an application using cle
   - → update function receives event data and yields new state
   - → view function reduces state to renderable props
   - → renderer function receives props for display
+- **Async/await support**: Non-blocking event loop using async channels
+- **Lock-free concurrency**: Events can be emitted from any thread without mutex overhead
 - **Type-safe event dispatch**: Callbacks in Props maintain type safety
 - **Effect system**: Controlled, declarative side effects
 - **no_std support**: Works in embedded environments (requires `alloc` for heap allocation)
@@ -130,10 +132,13 @@ let spawner = |fut| {
 
 ### Run the application
 
+The runtime uses async/await for non-blocking event processing. You can either await the runtime directly or spawn it:
+
 ```rust
 use oxide_mvu::MvuRuntime;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let model = Model { count: 0 };
     let logic = Logic;
     let renderer = MyRenderer;
@@ -144,7 +149,9 @@ fn main() {
     };
 
     let runtime = MvuRuntime::new(model, logic, renderer, spawner);
-    runtime.run();
+
+    // Run the event loop (consumes the runtime)
+    runtime.run().await;
 }
 ```
 

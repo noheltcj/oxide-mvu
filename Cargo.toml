@@ -17,7 +17,7 @@ testing = ["futures"]
 futures = ["dep:futures"]
 
 [dependencies]
-crossbeam-channel = "0.5"
+flume = { version = "0.12", default-features = false, features = ["async"] }
 futures = { version = "0.3.31", features = ["executor"], optional = true }
 portable-atomic-util = { version = "0.2.4", default-features = false, features = ["alloc"] }
 spin = { version = "0.10.0", features = ["portable_atomic"] }

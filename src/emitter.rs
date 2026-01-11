@@ -1,6 +1,6 @@
 //! Event emitter for embedding callbacks in Props.
 
-use crossbeam_channel::Sender;
+use flume::Sender;
 
 /// Event emitter that can be embedded in Props.
 ///

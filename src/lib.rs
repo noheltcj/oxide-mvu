@@ -7,7 +7,7 @@
 //!
 //! ## Example
 //!
-//! ```rust
+//! ```rust,no_run
 //! use oxide_mvu::{Emitter, Effect, MvuLogic, MvuRuntime, Renderer};
 //!
 //! #[derive(Clone)]
@@ -51,6 +51,7 @@
 //!     fn render(&mut self, _props: Props) {}
 //! }
 //!
+//! # async fn example() {
 //! // Create a spawner for your async runtime (no heap allocation needed)
 //! let spawner = |_fut| {
 //!     // Spawn the future on your chosen runtime
@@ -63,7 +64,10 @@
 //!     MyRenderer,
 //!     spawner
 //! );
-//! runtime.run();
+//!
+//! // Run the async event loop
+//! runtime.run().await;
+//! # }
 //! ```
 
 #[cfg(feature = "no_std")]
