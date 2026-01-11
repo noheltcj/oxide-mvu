@@ -51,16 +51,16 @@
 //!     fn render(&mut self, _props: Props) {}
 //! }
 //!
-//! // Create a spawner for your async runtime
-//! let spawner = Box::new(|_fut| {
+//! // Create a spawner for your async runtime (no heap allocation needed)
+//! let spawner = |_fut| {
 //!     // Spawn the future on your chosen runtime
 //!     // e.g., tokio::spawn(fut); or async_std::task::spawn(fut);
-//! });
+//! };
 //!
 //! let runtime = MvuRuntime::new(
 //!     Model { count: 0 },
-//!     Box::new(MyLogic),
-//!     Box::new(MyRenderer),
+//!     MyLogic,
+//!     MyRenderer,
 //!     spawner
 //! );
 //! runtime.run();
@@ -77,11 +77,11 @@ mod renderer;
 mod runtime;
 
 // Public re-exports
-pub use effect::{Effect, Spawner};
+pub use effect::Effect;
 pub use emitter::Emitter;
 pub use logic::MvuLogic;
 pub use renderer::Renderer;
-pub use runtime::MvuRuntime;
+pub use runtime::{MvuRuntime, Spawner};
 
 // Test utilities (only available with 'testing' feature or during tests)
 #[cfg(any(test, feature = "testing"))]

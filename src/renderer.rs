@@ -2,9 +2,6 @@
 
 #[cfg(any(test, feature = "testing"))]
 #[cfg(feature = "no_std")]
-use alloc::boxed::Box;
-#[cfg(any(test, feature = "testing"))]
-#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 
 #[cfg(any(test, feature = "testing"))]
@@ -86,8 +83,8 @@ pub trait Renderer<Props> {
 /// // Construct a TestMvuRuntime using the renderer
 /// let runtime = TestMvuRuntime::new(
 ///     Model { count: 0 },
-///     Box::new(Logic),
-///     renderer.boxed(),
+///     Logic,
+///     renderer.clone(),
 ///     create_test_spawner()
 /// );
 ///
@@ -103,40 +100,34 @@ pub struct TestRenderer<Props> {
 }
 
 #[cfg(any(test, feature = "testing"))]
-struct InternalTestRenderer<Props> {
-    renders: Arc<Mutex<Vec<Props>>>,
+impl<Props> Clone for TestRenderer<Props> {
+    fn clone(&self) -> Self {
+        Self {
+            renders: self.renders.clone(),
+        }
+    }
 }
 
 #[cfg(any(test, feature = "testing"))]
-impl<Props> Renderer<Props> for InternalTestRenderer<Props> {
+impl<Props> Renderer<Props> for TestRenderer<Props> {
     fn render(&mut self, props: Props) {
         self.renders.lock().push(props);
     }
 }
 
 #[cfg(any(test, feature = "testing"))]
-impl<Props: 'static + Send> Default for TestRenderer<Props> {
+impl<Props: 'static> Default for TestRenderer<Props> {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[cfg(any(test, feature = "testing"))]
-impl<Props: 'static + Send> TestRenderer<Props> {
+impl<Props: 'static> TestRenderer<Props> {
     pub fn new() -> Self {
         Self {
             renders: Arc::new(Mutex::new(Vec::new())),
         }
-    }
-
-    /// Get a boxed renderer to pass to the MVU runtime.
-    ///
-    /// The returned renderer shares the same capture storage as this TestRenderer,
-    /// so you can use [`with_renders`](Self::with_renders) to inspect captured Props.
-    pub fn boxed(&self) -> Box<dyn Renderer<Props> + Send> {
-        Box::new(InternalTestRenderer {
-            renders: self.renders.clone(),
-        })
     }
 
     /// Get the number of renders that have occurred.
@@ -154,7 +145,7 @@ impl<Props: 'static + Send> TestRenderer<Props> {
     ///
     /// ```rust
     /// # use oxide_mvu::TestRenderer;
-    /// # struct Props { count: i32, on_click: Box<dyn Fn() + Send> }
+    /// # struct Props { count: i32, on_click: Box<dyn Fn()> }
     /// # let renderer = TestRenderer::<Props>::new();
     ///
     /// // Compute render count
