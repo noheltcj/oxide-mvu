@@ -2,19 +2,13 @@
 
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-#[cfg(feature = "no_std")]
-use alloc::vec::Vec;
 
 use core::future::Future;
 use core::pin::Pin;
 
-use portable_atomic_util::Arc;
-use spin::Mutex;
+use crossbeam_channel::Receiver;
 
 use crate::{Emitter, MvuLogic, Renderer};
-
-#[cfg(any(test, feature = "testing"))]
-use crate::Effect;
 
 /// A spawner trait for executing futures on an async runtime.
 ///
@@ -38,8 +32,6 @@ where
     }
 }
 
-struct EventQueue<Event: Send>(Vec<Event>);
-
 /// The MVU runtime that orchestrates the event loop.
 ///
 /// This is the core of the framework. It:
@@ -48,9 +40,9 @@ struct EventQueue<Event: Send>(Vec<Event>);
 /// 3. Reduces the Model to Props via [`MvuLogic::view`]
 /// 4. Delivers Props to the [`Renderer`] for rendering
 ///
-/// The runtime creates a single [`Emitter`] that automatically processes events
-/// when [`Emitter::emit`] is called, regardless of which thread it's called from.
-/// Events are processed synchronously in a thread-safe manner.
+/// The runtime creates a single [`Emitter`] that can send events from any thread.
+/// Events are queued via a lock-free channel and processed on the thread where
+/// [`MvuRuntime::run`] was called.
 ///
 /// For testing with manual control, use [`TestMvuRuntime`] with a [`crate::TestRenderer`].
 ///
@@ -74,7 +66,7 @@ where
 {
     logic: Logic,
     renderer: Render,
-    event_queue: Arc<Mutex<EventQueue<Event>>>,
+    event_receiver: Receiver<Event>,
     model: Model,
     emitter: Emitter<Event>,
     spawner: Spawn,
@@ -102,18 +94,13 @@ where
     /// * `renderer` - Platform rendering implementation for rendering Props
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
     pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
-        // Create state and emitter that enqueues to the state's event queue
-        let event_queue = Arc::new(Mutex::new(EventQueue(Vec::new())));
-
-        let event_queue_clone = event_queue.clone();
-        let emitter = Emitter::new(move |event| {
-            event_queue_clone.lock().0.push(event);
-        });
+        let (event_sender, event_receiver) = crossbeam_channel::unbounded();
+        let emitter = Emitter::new(event_sender);
 
         MvuRuntime {
             logic,
             renderer,
-            event_queue,
+            event_receiver,
             model: init_model,
             emitter,
             spawner,
@@ -121,21 +108,20 @@ where
         }
     }
 
-    /// Initialize the runtime loop.
+    /// Initialize the runtime and run the event processing loop.
     ///
     /// - Uses the MvuLogic::init function to create and enqueue initial side effects.
     /// - Reduces the initial Model provided at construction to Props via MvuLogic::view.
     /// - Renders the initial Props.
-    pub fn run(mut self) {
-        // Initialize the model and get initial effects
-        let (init_model, init_effect) = {
-            let (init_model, init_effect) = self.logic.init(self.model.clone());
-
-            // Update model
-            self.model = init_model.clone();
-
-            (init_model, init_effect)
-        };
+    /// - Processes events from the channel in a loop.
+    ///
+    /// This is an async function that runs the event loop. You can spawn it on your
+    /// chosen runtime using the spawner, or await it directly.
+    ///
+    /// Events can be emitted from any thread via the Emitter, but are always processed
+    /// sequentially on the thread where this future is awaited/polled.
+    pub async fn run(&mut self) {
+        let (init_model, init_effect) = self.logic.init(self.model.clone());
 
         let initial_props = {
             let emitter = &self.emitter;
@@ -148,56 +134,31 @@ where
         let emitter = self.emitter.clone();
         let future = init_effect.execute(&emitter);
         self.spawner.spawn(Box::pin(future));
+
+        // Event processing loop
+        loop {
+            match self.event_receiver.recv() {
+                Ok(event) => self.step(event),
+                Err(_) => break, // Channel closed
+            }
+        }
     }
 
-    #[cfg(any(test, feature = "testing"))]
     fn step(&mut self, event: Event) {
-        // Reduce event and render props
-        let (model, effect, props) = self.reduce_event(event);
+        // Update model with event
+        let (new_model, effect) = self.logic.update(event, &self.model);
 
+        // Reduce to props and render
+        let props = self.logic.view(&new_model, &self.emitter);
         self.renderer.render(props);
 
         // Update model
-        self.model = model;
+        self.model = new_model;
 
-        // Execute the effect (which may enqueue more events)
+        // Execute the effect
         let emitter = self.emitter.clone();
         let future = effect.execute(&emitter);
         self.spawner.spawn(Box::pin(future));
-
-        // Process any newly queued events
-        self.process_queued_events()
-    }
-
-    #[cfg(any(test, feature = "testing"))]
-    /// Dispatch a single event through update -> view -> render.
-    fn reduce_event(&self, event: Event) -> (Model, Effect<Event>, Props) {
-        // Update model just event
-        let (new_model, effect) = self.logic.update(event, &self.model);
-
-        // Reduce the new model and emitter to props
-        let emitter = &self.emitter;
-        let props = self.logic.view(&new_model, emitter);
-
-        (new_model, effect, props)
-    }
-
-    #[cfg(any(test, feature = "testing"))]
-    /// Process all queued events (for testing).
-    ///
-    /// This is exposed for TestMvuRuntime to manually drive event processing.
-    fn process_queued_events(&mut self) {
-        loop {
-            let event_queue_mutex = self.event_queue.clone();
-            let next_event = {
-                let mut event_queue = event_queue_mutex.lock();
-                if event_queue.0.is_empty() {
-                    break;
-                }
-                event_queue.0.remove(0)
-            }; // Lock is dropped here
-            self.step(next_event);
-        }
     }
 }
 
@@ -340,21 +301,16 @@ where
     /// * `renderer` - Platform rendering implementation for rendering Props
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
     pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
-        // Create state and emitter that enqueues to the state's event queue
-        let event_queue = Arc::new(Mutex::new(EventQueue(Vec::new())));
-        let event_queue_mutex = event_queue.clone();
-
-        let emitter = Emitter::new(move |event| {
-            event_queue_mutex.lock().0.push(event);
-        });
+        // Create unbounded channel for event queue
+        let (event_sender, event_receiver) = crossbeam_channel::unbounded();
 
         TestMvuRuntime {
             runtime: MvuRuntime {
                 logic,
                 renderer,
-                event_queue,
+                event_receiver,
                 model: init_model,
-                emitter,
+                emitter: Emitter::new(event_sender),
                 spawner,
                 _props: core::marker::PhantomData,
             },
@@ -378,6 +334,15 @@ where
 
         TestMvuDriver {
             _runtime: self.runtime,
+        }
+    }
+
+    /// Process all queued events (for testing).
+    ///
+    /// This is exposed for TestMvuRuntime to manually drive event processing.
+    fn process_queued_events(&mut self) {
+        while let Ok(event) = self.runtime.event_receiver.try_recv() {
+            self.runtime.step(event);
         }
     }
 }
