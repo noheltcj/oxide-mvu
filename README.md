@@ -38,13 +38,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-oxide-mvu = "0.2.0"
+oxide-mvu = "0.3.0"
 ```
 
 For `no_std` environments:
 ```toml
 [dependencies]
-oxide-mvu = { version = "0.2.0", features = ["no_std"] }
+oxide-mvu = { version = "0.3.0", features = ["no_std"] }
 ```
 
 ## Usage
@@ -173,7 +173,7 @@ To access the testing helpers in your project, enable the `testing` feature:
 
 ```toml
 [dev-dependencies]
-oxide-mvu = { version = "0.2.0", features = ["testing"] }
+oxide-mvu = { version = "0.3.0", features = ["testing"] }
 ```
 
 This gives you access to:
