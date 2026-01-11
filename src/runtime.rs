@@ -20,7 +20,7 @@ use crate::Effect;
 ///
 /// This abstraction allows you to use whatever concurrency model you want (tokio, async-std, embassy, etc.).
 ///
-/// Function pointers automatically implement this trait.
+/// Function pointers and closures automatically implement this trait via the blanket implementation.
 pub trait Spawner {
     /// Spawn a future on the async runtime.
     fn spawn(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>);
