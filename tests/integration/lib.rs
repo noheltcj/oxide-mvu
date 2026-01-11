@@ -3,6 +3,9 @@ mod simple_logic;
 pub(crate) use simple_logic::*;
 
 use oxide_mvu::{create_test_spawner, Effect, TestMvuDriver, TestMvuRuntime, TestRenderer};
+
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 mod effect_dispatch_tests;
@@ -13,10 +16,8 @@ pub(crate) struct IntegrationTestStubbing {
     mock_effects_dependency: MockEffectsDependency,
 }
 
-pub(crate) type TestSpawner = fn(std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>);
-
 pub(crate) type TestDriver =
-    TestMvuDriver<TestEvent, TestModel, TestProps, TestLogic, TestRenderer<TestProps>, TestSpawner>;
+    TestMvuDriver<TestEvent, TestModel, TestProps, TestLogic, TestRenderer<TestProps>, fn(Pin<Box<dyn Future<Output = ()> + Send>>)>;
 
 pub(crate) struct IntegrationTestHarness {
     pub(crate) driver: TestDriver,
