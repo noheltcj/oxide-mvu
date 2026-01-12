@@ -6,9 +6,16 @@ use alloc::boxed::Box;
 use core::future::Future;
 use core::pin::Pin;
 
-use flume::Receiver;
+use thingbuf::mpsc::{channel, Receiver};
 
+use crate::Event as EventTrait;
 use crate::{Emitter, MvuLogic, Renderer};
+
+/// Default event channel capacity.
+///
+/// This bounds the number of events that can be queued before `emit()` drops events.
+/// Increase this if your application generates high-frequency bursts of events.
+const DEFAULT_EVENT_CAPACITY: usize = 1024;
 
 /// A spawner trait for executing futures on an async runtime.
 ///
@@ -58,7 +65,7 @@ where
 /// * `Spawn` - The spawner implementation type (implements [`Spawner`])
 pub struct MvuRuntime<Event, Model, Props, Logic, Render, Spawn>
 where
-    Event: Send,
+    Event: EventTrait,
     Model: Clone,
     Logic: MvuLogic<Event, Model, Props>,
     Render: Renderer<Props>,
@@ -66,7 +73,9 @@ where
 {
     logic: Logic,
     renderer: Render,
-    event_receiver: Receiver<Event>,
+    // Note: Events are wrapped in Option to satisfy thingbuf's Default requirement.
+    // The channel uses Option::default() (None) for recycling empty slots.
+    event_receiver: Receiver<Option<Event>>,
     model: Model,
     emitter: Emitter<Event>,
     spawner: Spawn,
@@ -76,7 +85,7 @@ where
 impl<Event, Model, Props, Logic, Render, Spawn>
     MvuRuntime<Event, Model, Props, Logic, Render, Spawn>
 where
-    Event: Send + 'static,
+    Event: EventTrait,
     Model: Clone + 'static,
     Props: 'static,
     Logic: MvuLogic<Event, Model, Props>,
@@ -94,7 +103,7 @@ where
     /// * `renderer` - Platform rendering implementation for rendering Props
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
     pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
-        let (event_sender, event_receiver) = flume::unbounded();
+        let (event_sender, event_receiver) = channel(DEFAULT_EVENT_CAPACITY);
         let emitter = Emitter::new(event_sender);
 
         MvuRuntime {
@@ -136,7 +145,7 @@ where
         self.spawner.spawn(Box::pin(future));
 
         // Event processing loop
-        while let Ok(event) = self.event_receiver.recv_async().await {
+        while let Some(Some(event)) = self.event_receiver.recv().await {
             self.step(event)
         }
     }
@@ -192,7 +201,7 @@ pub fn create_test_spawner() -> fn(Pin<Box<dyn Future<Output = ()> + Send>>) {
 /// See [`TestMvuRuntime`] for usage.
 pub struct TestMvuDriver<Event, Model, Props, Logic, Render, Spawn>
 where
-    Event: Send + 'static,
+    Event: EventTrait,
     Model: Clone + 'static,
     Props: 'static,
     Logic: MvuLogic<Event, Model, Props>,
@@ -206,7 +215,7 @@ where
 impl<Event, Model, Props, Logic, Render, Spawn>
     TestMvuDriver<Event, Model, Props, Logic, Render, Spawn>
 where
-    Event: Send + 'static,
+    Event: EventTrait,
     Model: Clone + 'static,
     Props: 'static,
     Logic: MvuLogic<Event, Model, Props>,
@@ -236,6 +245,7 @@ where
 ///
 /// ```rust
 /// use oxide_mvu::{Emitter, Effect, Renderer, MvuLogic, TestMvuRuntime};
+/// # #[derive(Clone)]
 /// # enum Event { Increment }
 /// # #[derive(Clone)]
 /// # struct Model { count: i32 }
@@ -248,7 +258,7 @@ where
 /// #     }
 /// #     fn view(&self, model: &Model, emitter: &Emitter<Event>) -> Props {
 /// #         let e = emitter.clone();
-/// #         Props { count: model.count, on_click: Box::new(move || e.emit(Event::Increment)) }
+/// #         Props { count: model.count, on_click: Box::new(move || { e.try_emit(Event::Increment); }) }
 /// #     }
 /// # }
 /// # struct TestRenderer;
@@ -266,7 +276,7 @@ where
 /// ```
 pub struct TestMvuRuntime<Event, Model, Props, Logic, Render, Spawn>
 where
-    Event: Send + 'static,
+    Event: EventTrait,
     Model: Clone + 'static,
     Props: 'static,
     Logic: MvuLogic<Event, Model, Props>,
@@ -280,7 +290,7 @@ where
 impl<Event, Model, Props, Logic, Render, Spawn>
     TestMvuRuntime<Event, Model, Props, Logic, Render, Spawn>
 where
-    Event: Send + 'static,
+    Event: EventTrait,
     Model: Clone + 'static,
     Props: 'static,
     Logic: MvuLogic<Event, Model, Props>,
@@ -298,8 +308,8 @@ where
     /// * `renderer` - Platform rendering implementation for rendering Props
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
     pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
-        // Create unbounded channel for event queue
-        let (event_sender, event_receiver) = flume::unbounded();
+        // Create bounded channel for event queue
+        let (event_sender, event_receiver) = channel(DEFAULT_EVENT_CAPACITY);
 
         TestMvuRuntime {
             runtime: MvuRuntime {
@@ -336,7 +346,7 @@ where
     ///
     /// This is exposed for TestMvuRuntime to manually drive event processing.
     fn process_queued_events(&mut self) {
-        while let Ok(event) = self.runtime.event_receiver.try_recv() {
+        while let Ok(Some(event)) = self.runtime.event_receiver.try_recv() {
             self.runtime.step(event);
         }
     }

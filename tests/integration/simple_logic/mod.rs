@@ -52,7 +52,7 @@ impl MvuLogic<TestEvent, TestModel, TestProps> for TestLogic {
         TestProps {
             count: model.count,
             on_increment: Box::new(move || {
-                emitter.emit(TestEvent::Increment);
+                emitter.try_emit(TestEvent::Increment);
             }),
         }
     }

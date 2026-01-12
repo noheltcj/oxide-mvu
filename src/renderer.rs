@@ -64,6 +64,7 @@ pub trait Renderer<Props> {
 /// # #[derive(Clone)]
 /// # struct Model { count: i32 }
 /// #
+/// # #[derive(Clone)]
 /// # enum Event { Inc }
 /// #
 /// # struct Logic;
