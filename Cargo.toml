@@ -17,7 +17,7 @@ testing = ["futures"]
 futures = ["dep:futures"]
 
 [dependencies]
-thingbuf = { version = "0.1", default-features = false, features = ["alloc"] }
+async-channel = { version = "2.5.0", default-features = false, features = ["portable-atomic"] }
 futures = { version = "0.3.31", features = ["executor"], optional = true }
 portable-atomic-util = { version = "0.2.4", default-features = false, features = ["alloc"] }
 spin = { version = "0.10.0", features = ["portable_atomic"] }

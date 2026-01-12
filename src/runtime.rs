@@ -6,7 +6,7 @@ use alloc::boxed::Box;
 use core::future::Future;
 use core::pin::Pin;
 
-use thingbuf::mpsc::{channel, Receiver};
+use async_channel::{bounded, Receiver};
 
 use crate::Event as EventTrait;
 use crate::{Emitter, MvuLogic, Renderer};
@@ -48,7 +48,7 @@ where
 /// 4. Delivers Props to the [`Renderer`] for rendering
 ///
 /// The runtime creates a single [`Emitter`] that can send events from any thread.
-/// Events are queued via a lock-free channel and processed on the thread where
+/// Events are queued via a lock-free MPMC channel and processed on the thread where
 /// [`MvuRuntime::run`] was called.
 ///
 /// For testing with manual control, use [`TestMvuRuntime`] with a [`crate::TestRenderer`].
@@ -73,9 +73,7 @@ where
 {
     logic: Logic,
     renderer: Render,
-    // Note: Events are wrapped in Option to satisfy thingbuf's Default requirement.
-    // The channel uses Option::default() (None) for recycling empty slots.
-    event_receiver: Receiver<Option<Event>>,
+    event_receiver: Receiver<Event>,
     model: Model,
     emitter: Emitter<Event>,
     spawner: Spawn,
@@ -103,7 +101,7 @@ where
     /// * `renderer` - Platform rendering implementation for rendering Props
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
     pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
-        let (event_sender, event_receiver) = channel(DEFAULT_EVENT_CAPACITY);
+        let (event_sender, event_receiver) = bounded(DEFAULT_EVENT_CAPACITY);
         let emitter = Emitter::new(event_sender);
 
         MvuRuntime {
@@ -145,8 +143,8 @@ where
         self.spawner.spawn(Box::pin(future));
 
         // Event processing loop
-        while let Some(Some(event)) = self.event_receiver.recv().await {
-            self.step(event)
+        while let Ok(event) = self.event_receiver.recv().await {
+            self.step(event);
         }
     }
 
@@ -309,7 +307,7 @@ where
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
     pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
         // Create bounded channel for event queue
-        let (event_sender, event_receiver) = channel(DEFAULT_EVENT_CAPACITY);
+        let (event_sender, event_receiver) = bounded(DEFAULT_EVENT_CAPACITY);
 
         TestMvuRuntime {
             runtime: MvuRuntime {
@@ -346,7 +344,7 @@ where
     ///
     /// This is exposed for TestMvuRuntime to manually drive event processing.
     fn process_queued_events(&mut self) {
-        while let Ok(Some(event)) = self.runtime.event_receiver.try_recv() {
+        while let Ok(event) = self.runtime.event_receiver.try_recv() {
             self.runtime.step(event);
         }
     }
