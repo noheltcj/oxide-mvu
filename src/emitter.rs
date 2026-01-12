@@ -1,6 +1,6 @@
 //! Event emitter for embedding callbacks in Props.
 
-use thingbuf::mpsc::Sender;
+use async_channel::Sender;
 
 use crate::Event as EventTrait;
 
@@ -9,7 +9,7 @@ use crate::Event as EventTrait;
 /// Clone this handle to create callbacks in your Props that can trigger
 /// events when invoked (e.g., by user interaction).
 ///
-/// `Emitter` wraps a lock-free channel sender, making it cheap to clone
+/// `Emitter` wraps a lock-free MPMC channel sender, making it cheap to clone
 /// and thread-safe without any locking overhead.
 ///
 /// # Example
@@ -58,9 +58,7 @@ use crate::Event as EventTrait;
 ///     }
 /// }
 /// ```
-// Note: We wrap events in Option internally to satisfy thingbuf's Default requirement
-// for its recycling mechanism. This allows us to avoid requiring Default on user events.
-pub struct Emitter<Event: EventTrait>(pub(crate) Sender<Option<Event>>);
+pub struct Emitter<Event: EventTrait>(pub(crate) Sender<Event>);
 
 impl<Event: EventTrait> Clone for Emitter<Event> {
     fn clone(&self) -> Self {
@@ -70,7 +68,7 @@ impl<Event: EventTrait> Clone for Emitter<Event> {
 
 impl<Event: EventTrait> Emitter<Event> {
     /// Create a new emitter from a channel sender.
-    pub(crate) fn new(sender: Sender<Option<Event>>) -> Self {
+    pub(crate) fn new(sender: Sender<Event>) -> Self {
         Self(sender)
     }
 
@@ -81,7 +79,7 @@ impl<Event: EventTrait> Emitter<Event> {
     ///
     /// Multiple threads can safely call this method concurrently via the lock-free channel.
     pub fn try_emit(&self, event: Event) -> bool {
-        self.0.try_send(Some(event)).is_ok()
+        self.0.try_send(event).is_ok()
     }
 
     /// Emit an event, waiting until space is available.
@@ -91,6 +89,6 @@ impl<Event: EventTrait> Emitter<Event> {
     ///
     /// Multiple threads can safely call this method concurrently via the lock-free channel.
     pub async fn emit(&self, event: Event) {
-        self.0.send(Some(event)).await.ok();
+        self.0.send(event).await.ok();
     }
 }
