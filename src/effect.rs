@@ -9,6 +9,7 @@ use core::future::Future;
 use core::pin::Pin;
 
 use crate::Emitter;
+use crate::Event as EventTrait;
 
 /// Declarative description of events to be processed.
 ///
@@ -39,9 +40,9 @@ use crate::Emitter;
 /// // No side effects
 /// let effect: Effect<Event> = Effect::none();
 /// ```
-pub struct Effect<Event: Send>(Box<dyn FnOnceBox<Event> + Send>);
+pub struct Effect<Event: EventTrait>(Box<dyn FnOnceBox<Event> + Send>);
 
-impl<Event: Send + 'static> Effect<Event> {
+impl<Event: EventTrait> Effect<Event> {
     /// Execute the effect, consuming it and returning a future.
     ///
     /// The returned future will be spawned on your async runtime using the provided spawner.
@@ -53,7 +54,9 @@ impl<Event: Send + 'static> Effect<Event> {
     ///
     /// This is private - use [`Effect::none()`] instead.
     fn new() -> Self {
-        fn empty_fn<Event: Send>(_: &Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+        fn empty_fn<Event: EventTrait>(
+            _: &Emitter<Event>,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
             Box::pin(async {})
         }
         Self(Box::new(empty_fn))
@@ -73,13 +76,11 @@ impl<Event: Send + 'static> Effect<Event> {
     ///
     /// let effect = Effect::just(Event::Refresh);
     /// ```
-    pub fn just(event: Event) -> Self
-    where
-        Event: Send + 'static,
-    {
+    pub fn just(event: Event) -> Self {
         Self(Box::new(move |emitter: &Emitter<Event>| {
             let emitter = emitter.clone();
-            Box::pin(async move { emitter.emit(event) }) as Pin<Box<dyn Future<Output = ()> + Send>>
+            Box::pin(async move { emitter.emit(event).await })
+                as Pin<Box<dyn Future<Output = ()> + Send>>
         }))
     }
 
@@ -165,8 +166,8 @@ impl<Event: Send + 'static> Effect<Event> {
     /// let effect = Effect::from_async(
     ///     |emitter| async move {
     ///         match fetch_from_api().await {
-    ///             Ok(data) => emitter.emit(Event::DataLoaded(data)),
-    ///             Err(err) => emitter.emit(Event::DataFailed(err)),
+    ///             Ok(data) => emitter.emit(Event::DataLoaded(data)).await,
+    ///             Err(err) => emitter.emit(Event::DataFailed(err)).await,
     ///         }
     ///     }
     /// );
@@ -183,7 +184,7 @@ impl<Event: Send + 'static> Effect<Event> {
     /// let await_timer_effect = Effect::from_async(
     ///     |emitter| async move {
     ///         // Await timer
-    ///         emitter.emit(Event::TimerAlert);
+    ///         emitter.emit(Event::TimerAlert).await;
     ///     }
     /// );
     /// ```
@@ -199,14 +200,14 @@ impl<Event: Send + 'static> Effect<Event> {
     }
 }
 
-trait FnOnceBox<Event: Send> {
+trait FnOnceBox<Event: EventTrait> {
     fn call_box(
         self: Box<Self>,
         emitter: &Emitter<Event>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
 }
 
-impl<F, Event: Send> FnOnceBox<Event> for F
+impl<F, Event: EventTrait> FnOnceBox<Event> for F
 where
     F: for<'a> FnOnce(&'a Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>>,
 {

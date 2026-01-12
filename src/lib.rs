@@ -49,7 +49,7 @@
 //!         Props {
 //!             count: model.count,
 //!             on_accumulate_click: Box::new(move || {
-//!                 emitter.emit(Event::AccumulateClicked)
+//!                 emitter.try_emit(Event::AccumulateClicked);
 //!             }),
 //!         }
 //!     }
@@ -90,6 +90,14 @@
 
 #[cfg(feature = "no_std")]
 extern crate alloc;
+
+/// Trait alias for event type constraints.
+///
+/// All events must implement these bounds to work with the MVU runtime.
+pub trait Event: Send + Sync + Clone + 'static {}
+
+/// Blanket implementation for any type that satisfies the bounds.
+impl<T> Event for T where T: Send + Sync + Clone + 'static {}
 
 // Module declarations
 mod effect;
