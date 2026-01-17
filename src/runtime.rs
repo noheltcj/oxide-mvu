@@ -465,8 +465,6 @@ where
 {
     /// Create a builder for configuring the test runtime.
     ///
-    /// Use this when you need to customize runtime parameters like event buffer capacity.
-    ///
     /// # Arguments
     ///
     /// * `init_model` - The initial state
