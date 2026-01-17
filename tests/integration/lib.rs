@@ -94,7 +94,8 @@ impl IntegrationTestStubbing {
             effects: Box::new(ArcMutexWrapper(mock_effects_arc.clone())),
         };
 
-        let mut builder = TestMvuRuntime::builder(model, logic, renderer.clone(), create_test_spawner());
+        let mut builder =
+            TestMvuRuntime::builder(model, logic, renderer.clone(), create_test_spawner());
         if let Some(capacity) = self.event_buffer_capacity {
             builder = builder.capacity(capacity);
         }

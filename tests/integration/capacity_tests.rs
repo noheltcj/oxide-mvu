@@ -64,7 +64,10 @@ fn given_capacity_of_2_when_processing_between_emissions_should_allow_more_event
     });
 
     assert!(third_ok, "Should be able to emit after processing");
-    assert!(fourth_ok, "Should be able to emit second event after processing");
+    assert!(
+        fourth_ok,
+        "Should be able to emit second event after processing"
+    );
 
     // Process remaining events
     test.driver.process_events();
@@ -97,7 +100,11 @@ fn given_default_capacity_should_handle_many_events() {
     });
 
     for (i, result) in emit_results.iter().enumerate().take(32) {
-        assert!(result, "Emit {} should succeed with default capacity", i + 1);
+        assert!(
+            result,
+            "Emit {} should succeed with default capacity",
+            i + 1
+        );
     }
     assert!(
         !emit_results[32],

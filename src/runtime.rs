@@ -171,7 +171,6 @@ where
     Render: Renderer<Props>,
     Spawn: Spawner,
 {
-
     /// Create a builder for configuring the runtime.
     ///
     /// Use this when you need to customize runtime parameters like event buffer capacity.
