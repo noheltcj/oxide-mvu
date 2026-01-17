@@ -38,13 +38,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-oxide-mvu = "0.3.2"
+oxide-mvu = "0.4.0"
 ```
 
 For `no_std` environments:
 ```toml
 [dependencies]
-oxide-mvu = { version = "0.3.2", features = ["no_std"] }
+oxide-mvu = { version = "0.4.0", features = ["no_std"] }
 ```
 
 ## Usage
@@ -95,8 +95,8 @@ impl MvuLogic<Event, Model, Props> for Logic {
         let emitter_dec = emitter.clone();
         Props {
             count: model.count,
-            on_increment: Box::new(move || emitter_inc.emit(Event::Increment)),
-            on_decrement: Box::new(move || emitter_dec.emit(Event::Decrement)),
+            on_increment: Box::new(move || { emitter_inc.try_emit(Event::Increment); }),
+            on_decrement: Box::new(move || { emitter_dec.try_emit(Event::Decrement); }),
         }
     }
 }
@@ -156,12 +156,32 @@ async fn main() {
         tokio::spawn(fut);
     };
 
-    let runtime = MvuRuntime::new(model, logic, renderer, spawner);
+    let runtime = MvuRuntime::builder(model, logic, renderer, spawner).build();
 
     // Run the event loop (consumes the runtime)
     runtime.run().await;
 }
 ```
+
+### Configuring Event Buffer Capacity
+
+The runtime uses a bounded channel to queue events. The default capacity (`DEFAULT_EVENT_CAPACITY = 32`) is sized for embedded systems with limited heap. You can customize this via the builder:
+
+```rust
+use oxide_mvu::MvuRuntime;
+
+// For memory-constrained embedded systems
+let runtime = MvuRuntime::builder(model, logic, renderer, spawner)
+    .capacity(8)
+    .build();
+
+// For high-throughput applications with event bursts
+let runtime = MvuRuntime::builder(model, logic, renderer, spawner)
+    .capacity(1024)
+    .build();
+```
+
+When the buffer is full, `Emitter::try_emit()` returns `false` and the event is dropped. Use `Emitter::emit().await` if you need backpressure (waits until space is available).
 
 ## Testing
 
@@ -173,7 +193,7 @@ To access the testing helpers in your project, enable the `testing` feature:
 
 ```toml
 [dev-dependencies]
-oxide-mvu = { version = "0.3.2", features = ["testing"] }
+oxide-mvu = { version = "0.4.0", features = ["testing"] }
 ```
 
 This gives you access to:
@@ -208,12 +228,12 @@ fn test_full_mvu_loop() {
     let renderer = TestRenderer::new();
 
     // Create runtime with test helpers
-    let runtime = TestMvuRuntime::new(
+    let runtime = TestMvuRuntime::builder(
         Model { count: 0 },
         Logic,
         renderer.clone(),
         create_test_spawner(),
-    );
+    ).build();
 
     // Run and get driver for manual event control
     let mut driver = runtime.run();
@@ -240,15 +260,7 @@ fn test_full_mvu_loop() {
 }
 ```
 
-### Key Testing Concepts
-
-- **`TestMvuRuntime`**: Unlike `MvuRuntime`, events are not automatically processed. You must call `driver.process_events()` to manually drive the event loop.
-- **`TestRenderer`**: Captures all rendered Props, allowing you to verify the runtime's output and trigger callbacks.
-- **`renderer.with_renders()`**: Access all captured Props for assertions or to trigger callbacks.
-- **`driver.process_events()`**: Process all queued events until the queue is empty.
-- **`create_test_spawner()`**: Creates a spawner that executes effects synchronously for deterministic testing.
-
-See the `tests` directory for complete examples.
+See the `tests` directory for more examples.
 
 ## License
 

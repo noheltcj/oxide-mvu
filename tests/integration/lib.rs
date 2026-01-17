@@ -8,12 +8,14 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
+mod capacity_tests;
 mod effect_dispatch_tests;
 mod reduction_and_emission_tests;
 
 pub(crate) struct IntegrationTestStubbing {
     mock_initial_effects_dependency: MockInitialEffectsDependency,
     mock_effects_dependency: MockEffectsDependency,
+    event_buffer_capacity: Option<usize>,
 }
 
 pub(crate) type TestDriver = TestMvuDriver<
@@ -71,6 +73,11 @@ impl IntegrationTestStubbing {
         self
     }
 
+    pub(crate) fn with_event_buffer_capacity(mut self, capacity: usize) -> Self {
+        self.event_buffer_capacity = Some(capacity);
+        self
+    }
+
     pub(crate) fn build(self) -> IntegrationTestHarness {
         self.create_integration_test_harness()
     }
@@ -87,7 +94,11 @@ impl IntegrationTestStubbing {
             effects: Box::new(ArcMutexWrapper(mock_effects_arc.clone())),
         };
 
-        let runtime = TestMvuRuntime::new(model, logic, renderer.clone(), create_test_spawner());
+        let mut builder = TestMvuRuntime::builder(model, logic, renderer.clone(), create_test_spawner());
+        if let Some(capacity) = self.event_buffer_capacity {
+            builder = builder.capacity(capacity);
+        }
+        let runtime = builder.build();
         let driver = runtime.run();
 
         IntegrationTestHarness {
@@ -116,5 +127,6 @@ pub(crate) fn build_integration_test() -> IntegrationTestStubbing {
     IntegrationTestStubbing {
         mock_initial_effects_dependency: MockInitialEffectsDependency::new(),
         mock_effects_dependency: MockEffectsDependency::new(),
+        event_buffer_capacity: None,
     }
 }

@@ -82,12 +82,12 @@ pub trait Renderer<Props> {
 /// let renderer = TestRenderer::new();
 ///
 /// // Construct a TestMvuRuntime using the renderer
-/// let runtime = TestMvuRuntime::new(
+/// let runtime = TestMvuRuntime::builder(
 ///     Model { count: 0 },
 ///     Logic,
 ///     renderer.clone(),
 ///     create_test_spawner()
-/// );
+/// ).build();
 ///
 /// let driver = runtime.run();
 ///

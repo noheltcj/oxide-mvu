@@ -14,8 +14,89 @@ use crate::{Emitter, MvuLogic, Renderer};
 /// Default event channel capacity.
 ///
 /// This bounds the number of events that can be queued before `emit()` drops events.
-/// Increase this if your application generates high-frequency bursts of events.
-const DEFAULT_EVENT_CAPACITY: usize = 1024;
+/// Sized for embedded systems with limited heap. Increase this via
+/// [`MvuRuntimeBuilder::capacity`] if your application generates high-frequency bursts of events.
+pub const DEFAULT_EVENT_CAPACITY: usize = 32;
+
+/// Builder for configuring and constructing an [`MvuRuntime`].
+///
+/// Created via [`MvuRuntime::builder`]. Allows customizing runtime parameters
+/// like event buffer capacity before building the runtime.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # use oxide_mvu::{Emitter, Effect, MvuLogic, MvuRuntime, Renderer};
+/// # #[derive(Clone)] enum Event {}
+/// # #[derive(Clone)] struct Model;
+/// # struct Props;
+/// # struct MyLogic;
+/// # impl MvuLogic<Event, Model, Props> for MyLogic {
+/// #     fn init(&self, model: Model) -> (Model, Effect<Event>) { (model, Effect::none()) }
+/// #     fn update(&self, _: Event, model: &Model) -> (Model, Effect<Event>) { (model.clone(), Effect::none()) }
+/// #     fn view(&self, _: &Model, _: &Emitter<Event>) -> Props { Props }
+/// # }
+/// # struct MyRenderer;
+/// # impl Renderer<Props> for MyRenderer { fn render(&mut self, _: Props) {} }
+/// // Use builder for custom configuration
+/// let runtime = MvuRuntime::builder(Model, MyLogic, MyRenderer, |_| {})
+///     .capacity(64)
+///     .build();
+/// ```
+pub struct MvuRuntimeBuilder<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: EventTrait,
+    Model: Clone,
+    Logic: MvuLogic<Event, Model, Props>,
+    Render: Renderer<Props>,
+    Spawn: Spawner,
+{
+    init_model: Model,
+    logic: Logic,
+    renderer: Render,
+    spawner: Spawn,
+    capacity: usize,
+    _event: core::marker::PhantomData<Event>,
+    _props: core::marker::PhantomData<Props>,
+}
+
+impl<Event, Model, Props, Logic, Render, Spawn>
+    MvuRuntimeBuilder<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: EventTrait,
+    Model: Clone + 'static,
+    Props: 'static,
+    Logic: MvuLogic<Event, Model, Props>,
+    Render: Renderer<Props>,
+    Spawn: Spawner,
+{
+    /// Set the event buffer capacity.
+    ///
+    /// This bounds the number of events that can be queued before
+    /// [`Emitter::try_emit`](crate::Emitter::try_emit) returns `false`.
+    ///
+    /// Defaults to [`DEFAULT_EVENT_CAPACITY`] (32).
+    pub fn capacity(mut self, capacity: usize) -> Self {
+        self.capacity = capacity;
+        self
+    }
+
+    /// Build the runtime with the configured settings.
+    pub fn build(self) -> MvuRuntime<Event, Model, Props, Logic, Render, Spawn> {
+        let (event_sender, event_receiver) = bounded(self.capacity);
+        let emitter = Emitter::new(event_sender);
+
+        MvuRuntime {
+            logic: self.logic,
+            renderer: self.renderer,
+            event_receiver,
+            model: self.init_model,
+            emitter,
+            spawner: self.spawner,
+            _props: core::marker::PhantomData,
+        }
+    }
+}
 
 /// A spawner trait for executing futures on an async runtime.
 ///
@@ -90,9 +171,10 @@ where
     Render: Renderer<Props>,
     Spawn: Spawner,
 {
-    /// Create a new runtime.
+
+    /// Create a builder for configuring the runtime.
     ///
-    /// The runtime will not be started until MvuRuntime::run is called.
+    /// Use this when you need to customize runtime parameters like event buffer capacity.
     ///
     /// # Arguments
     ///
@@ -100,17 +182,40 @@ where
     /// * `logic` - Application logic implementing MvuLogic
     /// * `renderer` - Platform rendering implementation for rendering Props
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
-    pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
-        let (event_sender, event_receiver) = bounded(DEFAULT_EVENT_CAPACITY);
-        let emitter = Emitter::new(event_sender);
-
-        MvuRuntime {
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use oxide_mvu::{Emitter, Effect, MvuLogic, MvuRuntime, Renderer};
+    /// # #[derive(Clone)] enum Event {}
+    /// # #[derive(Clone)] struct Model;
+    /// # struct Props;
+    /// # struct MyLogic;
+    /// # impl MvuLogic<Event, Model, Props> for MyLogic {
+    /// #     fn init(&self, model: Model) -> (Model, Effect<Event>) { (model, Effect::none()) }
+    /// #     fn update(&self, _: Event, model: &Model) -> (Model, Effect<Event>) { (model.clone(), Effect::none()) }
+    /// #     fn view(&self, _: &Model, _: &Emitter<Event>) -> Props { Props }
+    /// # }
+    /// # struct MyRenderer;
+    /// # impl Renderer<Props> for MyRenderer { fn render(&mut self, _: Props) {} }
+    /// // For memory-constrained embedded systems
+    /// let runtime = MvuRuntime::builder(Model, MyLogic, MyRenderer, |_| {})
+    ///     .capacity(8)
+    ///     .build();
+    /// ```
+    pub fn builder(
+        init_model: Model,
+        logic: Logic,
+        renderer: Render,
+        spawner: Spawn,
+    ) -> MvuRuntimeBuilder<Event, Model, Props, Logic, Render, Spawn> {
+        MvuRuntimeBuilder {
+            init_model,
             logic,
             renderer,
-            event_receiver,
-            model: init_model,
-            emitter,
             spawner,
+            capacity: DEFAULT_EVENT_CAPACITY,
+            _event: core::marker::PhantomData,
             _props: core::marker::PhantomData,
         }
     }
@@ -263,12 +368,12 @@ where
 /// # impl Renderer<Props> for TestRenderer { fn render(&mut self, _props: Props) {} }
 /// use oxide_mvu::create_test_spawner;
 ///
-/// let runtime = TestMvuRuntime::new(
+/// let runtime = TestMvuRuntime::builder(
 ///     Model { count: 0 },
 ///     MyApp,
 ///     TestRenderer,
 ///     create_test_spawner()
-/// );
+/// ).build();
 /// let mut driver = runtime.run();
 /// driver.process_events(); // Manually process events
 /// ```
@@ -285,6 +390,69 @@ where
 }
 
 #[cfg(any(test, feature = "testing"))]
+/// Builder for configuring and constructing a [`TestMvuRuntime`].
+///
+/// Created via [`TestMvuRuntime::builder`]. Allows customizing runtime parameters
+/// like event buffer capacity before building the test runtime.
+pub struct TestMvuRuntimeBuilder<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: EventTrait,
+    Model: Clone + 'static,
+    Props: 'static,
+    Logic: MvuLogic<Event, Model, Props>,
+    Render: Renderer<Props>,
+    Spawn: Spawner,
+{
+    init_model: Model,
+    logic: Logic,
+    renderer: Render,
+    spawner: Spawn,
+    capacity: usize,
+    _event: core::marker::PhantomData<Event>,
+    _props: core::marker::PhantomData<Props>,
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl<Event, Model, Props, Logic, Render, Spawn>
+    TestMvuRuntimeBuilder<Event, Model, Props, Logic, Render, Spawn>
+where
+    Event: EventTrait,
+    Model: Clone + 'static,
+    Props: 'static,
+    Logic: MvuLogic<Event, Model, Props>,
+    Render: Renderer<Props>,
+    Spawn: Spawner,
+{
+    /// Set the event buffer capacity.
+    ///
+    /// This bounds the number of events that can be queued before
+    /// [`Emitter::try_emit`](crate::Emitter::try_emit) returns `false`.
+    ///
+    /// Defaults to [`DEFAULT_EVENT_CAPACITY`].
+    pub fn capacity(mut self, capacity: usize) -> Self {
+        self.capacity = capacity;
+        self
+    }
+
+    /// Build the test runtime with the configured settings.
+    pub fn build(self) -> TestMvuRuntime<Event, Model, Props, Logic, Render, Spawn> {
+        let (event_sender, event_receiver) = bounded(self.capacity);
+
+        TestMvuRuntime {
+            runtime: MvuRuntime {
+                logic: self.logic,
+                renderer: self.renderer,
+                event_receiver,
+                model: self.init_model,
+                emitter: Emitter::new(event_sender),
+                spawner: self.spawner,
+                _props: core::marker::PhantomData,
+            },
+        }
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
 impl<Event, Model, Props, Logic, Render, Spawn>
     TestMvuRuntime<Event, Model, Props, Logic, Render, Spawn>
 where
@@ -295,9 +463,9 @@ where
     Render: Renderer<Props>,
     Spawn: Spawner,
 {
-    /// Create a new test runtime.
+    /// Create a builder for configuring the test runtime.
     ///
-    /// Creates an emitter that enqueues events without automatically processing them.
+    /// Use this when you need to customize runtime parameters like event buffer capacity.
     ///
     /// # Arguments
     ///
@@ -305,20 +473,20 @@ where
     /// * `logic` - Application logic implementing MvuLogic
     /// * `renderer` - Platform rendering implementation for rendering Props
     /// * `spawner` - Spawner to execute async effects on your chosen runtime
-    pub fn new(init_model: Model, logic: Logic, renderer: Render, spawner: Spawn) -> Self {
-        // Create bounded channel for event queue
-        let (event_sender, event_receiver) = bounded(DEFAULT_EVENT_CAPACITY);
-
-        TestMvuRuntime {
-            runtime: MvuRuntime {
-                logic,
-                renderer,
-                event_receiver,
-                model: init_model,
-                emitter: Emitter::new(event_sender),
-                spawner,
-                _props: core::marker::PhantomData,
-            },
+    pub fn builder(
+        init_model: Model,
+        logic: Logic,
+        renderer: Render,
+        spawner: Spawn,
+    ) -> TestMvuRuntimeBuilder<Event, Model, Props, Logic, Render, Spawn> {
+        TestMvuRuntimeBuilder {
+            init_model,
+            logic,
+            renderer,
+            spawner,
+            capacity: DEFAULT_EVENT_CAPACITY,
+            _event: core::marker::PhantomData,
+            _props: core::marker::PhantomData,
         }
     }
 
