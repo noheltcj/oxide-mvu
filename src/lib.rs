@@ -72,12 +72,12 @@
 //!         let _ = fut;
 //!     };
 //!
-//!     let runtime = MvuRuntime::new(
+//!     let runtime = MvuRuntime::builder(
 //!         Model { count: 0 },
 //!         MyLogic,
 //!         MyRenderer,
 //!         spawner,
-//!     );
+//!     ).build();
 //!
 //!     // `run()` returns a Future representing the event loop.
 //!     // It must be awaited inside an async context.
@@ -111,10 +111,10 @@ pub use effect::Effect;
 pub use emitter::Emitter;
 pub use logic::MvuLogic;
 pub use renderer::Renderer;
-pub use runtime::{MvuRuntime, Spawner};
+pub use runtime::{MvuRuntime, MvuRuntimeBuilder, Spawner, DEFAULT_EVENT_CAPACITY};
 
 // Test utilities (only available with 'testing' feature or during tests)
 #[cfg(any(test, feature = "testing"))]
 pub use renderer::TestRenderer;
 #[cfg(any(test, feature = "testing"))]
-pub use runtime::{create_test_spawner, TestMvuDriver, TestMvuRuntime};
+pub use runtime::{create_test_spawner, TestMvuDriver, TestMvuRuntime, TestMvuRuntimeBuilder};

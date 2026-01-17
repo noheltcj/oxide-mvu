@@ -12,7 +12,9 @@ pub(crate) struct TestModel {
 
 pub(crate) struct TestProps {
     pub(crate) count: i32,
-    pub(crate) on_increment: Box<dyn Fn() + Send>,
+    /// Callback that emits an Increment event via try_emit.
+    /// Returns true if the event was queued, false if the buffer was full.
+    pub(crate) on_increment: Box<dyn Fn() -> bool + Send>,
 }
 
 pub(crate) struct TestLogic {
@@ -51,9 +53,7 @@ impl MvuLogic<TestEvent, TestModel, TestProps> for TestLogic {
         let emitter = emitter.clone();
         TestProps {
             count: model.count,
-            on_increment: Box::new(move || {
-                emitter.try_emit(TestEvent::Increment);
-            }),
+            on_increment: Box::new(move || emitter.try_emit(TestEvent::Increment)),
         }
     }
 }
