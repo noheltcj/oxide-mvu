@@ -8,7 +8,7 @@ fn given_capacity_of_2_when_emitting_3_events_without_processing_should_drop_thi
     let mut test = build_integration_test()
         .given_no_initial_event()
         .given_a_noop_on_increment_side_effect()
-        .with_event_buffer_capacity(2)
+        .given_event_buffer_capacity(2)
         .build();
 
     // First two emissions should succeed (buffer has capacity 2)
@@ -43,7 +43,7 @@ fn given_capacity_of_2_when_processing_between_emissions_should_allow_more_event
     let mut test = build_integration_test()
         .given_no_initial_event()
         .given_a_noop_on_increment_side_effect()
-        .with_event_buffer_capacity(2)
+        .given_event_buffer_capacity(2)
         .build();
 
     // Emit 2 events (fills buffer)

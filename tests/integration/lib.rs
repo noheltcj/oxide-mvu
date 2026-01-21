@@ -73,7 +73,7 @@ impl IntegrationTestStubbing {
         self
     }
 
-    pub(crate) fn with_event_buffer_capacity(mut self, capacity: usize) -> Self {
+    pub(crate) fn given_event_buffer_capacity(mut self, capacity: usize) -> Self {
         self.event_buffer_capacity = Some(capacity);
         self
     }

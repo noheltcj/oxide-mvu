@@ -132,7 +132,8 @@ where
 /// Events are queued via a lock-free MPMC channel and processed on the thread where
 /// [`MvuRuntime::run`] was called.
 ///
-/// For testing with manual control, use [`TestMvuRuntime`] with a [`crate::TestRenderer`].
+/// For testing with manual control, use `TestMvuRuntime` with `TestRenderer`
+/// (both available with the `testing` feature).
 ///
 /// See the [crate-level documentation](crate) for a complete example.
 ///
