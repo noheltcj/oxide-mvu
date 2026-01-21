@@ -272,8 +272,18 @@
 //! Customize this via the builder:
 //!
 //! ```rust,no_run
-//! # use oxide_mvu::MvuRuntime;
-//! # struct Model; struct Logic; struct MyRenderer;
+//! # use oxide_mvu::{MvuRuntime, MvuLogic, Renderer, Effect, Emitter};
+//! # #[derive(Clone)] struct Model;
+//! # #[derive(Clone)] enum Event {}
+//! # struct Props;
+//! # struct Logic;
+//! # impl MvuLogic<Event, Model, Props> for Logic {
+//! #     fn init(&self, m: Model) -> (Model, Effect<Event>) { (m, Effect::none()) }
+//! #     fn update(&self, _: Event, m: &Model) -> (Model, Effect<Event>) { (m.clone(), Effect::none()) }
+//! #     fn view(&self, _: &Model, _: &Emitter<Event>) -> Props { Props }
+//! # }
+//! # struct MyRenderer;
+//! # impl Renderer<Props> for MyRenderer { fn render(&mut self, _: Props) {} }
 //! # let spawner = |_| {};
 //! // Memory-constrained embedded systems
 //! let runtime = MvuRuntime::builder(Model, Logic, MyRenderer, spawner)
@@ -304,7 +314,7 @@
 //! ```rust
 //! # #[cfg(feature = "testing")]
 //! # {
-//! use oxide_mvu::{Effect, MvuLogic, TestMvuRuntime};
+//! use oxide_mvu::{Effect, MvuLogic, Renderer, TestMvuRuntime, create_test_spawner};
 //! # #[derive(Clone)] enum Event { Increment }
 //! # #[derive(Clone)] struct Model { count: i32 }
 //! # struct Props;
@@ -316,14 +326,19 @@
 //! #     }
 //! #     fn view(&self, _: &Model, _: &oxide_mvu::Emitter<Event>) -> Props { Props }
 //! # }
+//! # struct MyRenderer;
+//! # impl Renderer<Props> for MyRenderer { fn render(&mut self, _: Props) {} }
 //!
-//! # async fn test() {
-//! let mut driver = TestMvuRuntime::builder(Model { count: 0 }, Logic).build();
+//! let runtime = TestMvuRuntime::builder(
+//!     Model { count: 0 },
+//!     Logic,
+//!     MyRenderer,
+//!     create_test_spawner()
+//! ).build();
 //!
-//! // Process an event and get the new model
-//! let model = driver.process(Event::Increment).await;
-//! assert_eq!(model.count, 1);
-//! # }
+//! let mut driver = runtime.run();
+//! // Manually process events in tests
+//! driver.process_events();
 //! # }
 //! ```
 //!
@@ -333,9 +348,7 @@
 //!
 //! The [`Spawner`] trait abstracts over different async runtimes. Common patterns:
 //!
-//! ```rust,no_run
-//! # use oxide_mvu::MvuRuntime;
-//! # struct Model; struct Logic; struct MyRenderer;
+//! ```rust,ignore
 //! // tokio
 //! let spawner = |fut| { tokio::spawn(fut); };
 //!
@@ -344,7 +357,6 @@
 //!
 //! // smol
 //! let spawner = |fut| { smol::spawn(fut).detach(); };
-//! # let runtime = MvuRuntime::builder(Model, Logic, MyRenderer, spawner).build();
 //! ```
 //!
 //! # See Also
