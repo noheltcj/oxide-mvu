@@ -30,3 +30,8 @@ futures = "0.3.31"
 [[test]]
 name = "integration"
 path = "tests/integration/lib.rs"
+
+[[bench]]
+name = "allocation_bench"
+path = "benches/allocation_bench.rs"
+harness = false
