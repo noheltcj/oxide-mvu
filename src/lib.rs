@@ -147,7 +147,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! oxide-mvu = "0.4.0"
+//! oxide-mvu = "0.4.1"
 //! ```
 //!
 //! ## `no_std` Environments
@@ -158,7 +158,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! oxide-mvu = { version = "0.4.0", features = ["no_std"] }
+//! oxide-mvu = { version = "0.4.1", features = ["no_std"] }
 //! ```
 //!
 //! The runtime uses lock-free concurrency and bounded channels to minimize the cost of event
@@ -306,7 +306,7 @@
 //!
 //! ```toml
 //! [dev-dependencies]
-//! oxide-mvu = { version = "0.4.0", features = ["testing"] }
+//! oxide-mvu = { version = "0.4.1", features = ["testing"] }
 //! ```
 //!
 //! Test your MVU logic deterministically:

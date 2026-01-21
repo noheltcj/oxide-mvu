@@ -40,7 +40,7 @@ This architecture eliminates implicit state mutation, making your application **
 
 ```toml
 [dependencies]
-oxide-mvu = "0.4.0"
+oxide-mvu = "0.4.1"
 ```
 
 ### Documentation
@@ -125,7 +125,7 @@ By default, `oxide-mvu` works with the standard library:
 
 ```toml
 [dependencies]
-oxide-mvu = "0.4.0"
+oxide-mvu = "0.4.1"
 ```
 
 ### `no_std` Environments
@@ -134,7 +134,7 @@ For embedded systems without the standard library:
 
 ```toml
 [dependencies]
-oxide-mvu = { version = "0.4.0", features = ["no_std"] }
+oxide-mvu = { version = "0.4.1", features = ["no_std"] }
 ```
 
 The runtime uses lock-free concurrency and bounded channels, making it suitable for resource-constrained systems (including single-core). Requires an allocator (`alloc` crate).
@@ -149,7 +149,7 @@ To access the testing helpers in your project, enable the `testing` feature:
 
 ```toml
 [dev-dependencies]
-oxide-mvu = { version = "0.4.0", features = ["testing"] }
+oxide-mvu = { version = "0.4.1", features = ["testing"] }
 ```
 
 This gives you access to:
