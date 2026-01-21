@@ -12,6 +12,57 @@ use crate::Event as EventTrait;
 /// `Emitter` wraps a lock-free MPMC channel sender, making it cheap to clone
 /// and thread-safe without any locking overhead.
 ///
+/// # Performance Characteristics
+///
+/// Cloning an `Emitter` is a cheap operation (equivalent to cloning an `Arc`).
+/// It increments a reference count using an atomic operation rather than
+/// allocating new memory. This makes it safe to clone frequently without
+/// significant performance cost.
+///
+/// However, atomic operations do have some overhead (memory barriers, cache
+/// coherency), so the following patterns are recommended for optimal performance:
+///
+/// ## Recommended Pattern: Clone Once per View
+///
+/// When creating multiple callbacks in your `view()` function, clone the emitter
+/// once and reuse it:
+///
+/// ```rust
+/// # use oxide_mvu::{Emitter, MvuLogic, Effect};
+/// # #[derive(Clone)] enum Event { Click, Hover, Focus }
+/// # #[derive(Clone)] struct Model;
+/// # struct Props {
+/// #     on_click: Box<dyn Fn()>,
+/// #     on_hover: Box<dyn Fn()>,
+/// #     on_focus: Box<dyn Fn()>,
+/// # }
+/// # struct MyApp;
+/// # impl MvuLogic<Event, Model, Props> for MyApp {
+/// #     fn init(&self, model: Model) -> (Model, Effect<Event>) { (model, Effect::none()) }
+/// #     fn update(&self, event: Event, model: &Model) -> (Model, Effect<Event>) { (model.clone(), Effect::none()) }
+/// fn view(&self, model: &Model, emitter: &Emitter<Event>) -> Props {
+///     // GOOD: Clone once, reuse for all callbacks
+///     let emitter = emitter.clone();
+///     Props {
+///         on_click: Box::new({
+///             let e = emitter.clone();
+///             move || { e.try_emit(Event::Click); }
+///         }),
+///         on_hover: Box::new({
+///             let e = emitter.clone();
+///             move || { e.try_emit(Event::Hover); }
+///         }),
+///         on_focus: Box::new({
+///             let e = emitter.clone();
+///             move || { e.try_emit(Event::Focus); }
+///         }),
+///     }
+/// }
+/// # }
+/// ```
+///
+/// This pattern minimizes atomic operations while maintaining clean code structure.
+///
 /// # Example
 ///
 /// ```rust

@@ -1,6 +1,7 @@
 //! Tests for event buffer capacity configuration.
 
 use super::build_integration_test;
+use oxide_mvu::DEFAULT_EVENT_CAPACITY;
 
 #[test]
 fn given_capacity_of_2_when_emitting_3_events_without_processing_should_drop_third_event() {
@@ -93,13 +94,13 @@ fn given_default_capacity_should_handle_many_events() {
     let emit_results = test.renders.with_renders(|renders| {
         let initial_props = renders.first().unwrap();
         let mut results = Vec::new();
-        for _ in 0..33 {
+        for _ in 0..(DEFAULT_EVENT_CAPACITY + 1) {
             results.push((initial_props.on_increment)());
         }
         results
     });
 
-    for (i, result) in emit_results.iter().enumerate().take(32) {
+    for (i, result) in emit_results.iter().enumerate().take(DEFAULT_EVENT_CAPACITY) {
         assert!(
             result,
             "Emit {} should succeed with default capacity",
@@ -107,7 +108,7 @@ fn given_default_capacity_should_handle_many_events() {
         );
     }
     assert!(
-        !emit_results[32],
+        !emit_results[DEFAULT_EVENT_CAPACITY],
         "Emit beyond default capacity should fail"
     );
 

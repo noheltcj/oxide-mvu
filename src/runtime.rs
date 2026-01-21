@@ -340,7 +340,7 @@ where
 ///
 /// Unlike [`MvuRuntime`], this runtime does not automatically
 /// process events when they are emitted. Instead, tests must manually call
-/// [`process_events`](TestMvuDriver::process_events) on the returned driver
+/// [`TestMvuDriver::process_events`] on the returned driver
 /// to process the event queue.
 ///
 /// This provides precise control over event timing in tests.
@@ -425,7 +425,7 @@ where
     /// Set the event buffer capacity.
     ///
     /// This bounds the number of events that can be queued before
-    /// [`Emitter::try_emit`](crate::Emitter::try_emit) returns `false`.
+    /// [`Emitter::try_emit`] returns `false`.
     ///
     /// Defaults to [`DEFAULT_EVENT_CAPACITY`].
     pub fn capacity(mut self, capacity: usize) -> Self {
