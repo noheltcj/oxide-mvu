@@ -1,7 +1,7 @@
 //! Tests for event buffer capacity configuration.
 
-use oxide_mvu::DEFAULT_EVENT_CAPACITY;
 use super::build_integration_test;
+use oxide_mvu::DEFAULT_EVENT_CAPACITY;
 
 #[test]
 fn given_capacity_of_2_when_emitting_3_events_without_processing_should_drop_third_event() {

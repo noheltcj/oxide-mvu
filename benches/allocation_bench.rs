@@ -79,15 +79,21 @@ impl AllocationReport {
 
     fn print(&self, label: &str) {
         println!("\n{}", label);
-        println!("  Allocations:      {} calls, {} bytes",
-                 self.allocation_count, self.allocated_bytes);
-        println!("  Deallocations:    {} calls, {} bytes",
-                 self.deallocation_count, self.deallocated_bytes);
+        println!(
+            "  Allocations:      {} calls, {} bytes",
+            self.allocation_count, self.allocated_bytes
+        );
+        println!(
+            "  Deallocations:    {} calls, {} bytes",
+            self.deallocation_count, self.deallocated_bytes
+        );
         println!("  Net allocations:  {}", self.net_allocations());
         println!("  Net heap usage:   {} bytes", self.net_bytes());
         if self.allocation_count > 0 {
-            println!("  Avg alloc size:   {} bytes",
-                     self.allocated_bytes / self.allocation_count);
+            println!(
+                "  Avg alloc size:   {} bytes",
+                self.allocated_bytes / self.allocation_count
+            );
         }
     }
 }
@@ -111,9 +117,11 @@ fn measure_effect_none(n: usize) {
     let report = ALLOCATOR.report();
     report.print(&format!("Effect::none() - {} calls", n));
     if report.allocation_count > 0 {
-        println!("  Per call:         {} allocations, {} bytes",
-                 report.allocation_count / n,
-                 report.allocated_bytes / n);
+        println!(
+            "  Per call:         {} allocations, {} bytes",
+            report.allocation_count / n,
+            report.allocated_bytes / n
+        );
     }
 }
 
@@ -127,9 +135,11 @@ fn measure_effect_just(n: usize) {
     let report = ALLOCATOR.report();
     report.print(&format!("Effect::just() - {} calls", n));
     if report.allocation_count > 0 {
-        println!("  Per call:         {} allocations, {} bytes",
-                 report.allocation_count / n,
-                 report.allocated_bytes / n);
+        println!(
+            "  Per call:         {} allocations, {} bytes",
+            report.allocation_count / n,
+            report.allocated_bytes / n
+        );
     }
 }
 
@@ -151,9 +161,11 @@ fn measure_effect_batch(n: usize, batch_size: usize) {
     let report = ALLOCATOR.report();
     report.print(&format!("Effect::batch({}) - {} calls", batch_size, n));
     if report.allocation_count > 0 {
-        println!("  Per call:         {} allocations, {} bytes",
-                 report.allocation_count / n,
-                 report.allocated_bytes / n);
+        println!(
+            "  Per call:         {} allocations, {} bytes",
+            report.allocation_count / n,
+            report.allocated_bytes / n
+        );
     }
 }
 
@@ -169,9 +181,11 @@ fn measure_effect_from_async(n: usize) {
     let report = ALLOCATOR.report();
     report.print(&format!("Effect::from_async() - {} calls", n));
     if report.allocation_count > 0 {
-        println!("  Per call:         {} allocations, {} bytes",
-                 report.allocation_count / n,
-                 report.allocated_bytes / n);
+        println!(
+            "  Per call:         {} allocations, {} bytes",
+            report.allocation_count / n,
+            report.allocated_bytes / n
+        );
     }
 }
 
@@ -190,10 +204,8 @@ fn measure_mixed_workload(n: usize) {
             }
             16..=18 => {
                 // 15% batch (size 2)
-                let _effect = Effect::batch(vec![
-                    Effect::just(BenchEvent::Increment),
-                    Effect::none(),
-                ]);
+                let _effect =
+                    Effect::batch(vec![Effect::just(BenchEvent::Increment), Effect::none()]);
             }
             _ => {
                 // 5% from_async
@@ -206,9 +218,11 @@ fn measure_mixed_workload(n: usize) {
     report.print(&format!("Mixed workload - {} effects", n));
     println!("  Distribution:     50% none, 30% just, 15% batch(2), 5% from_async");
     if report.allocation_count > 0 {
-        println!("  Per effect:       {} allocations, {} bytes",
-                 report.allocation_count / n,
-                 report.allocated_bytes / n);
+        println!(
+            "  Per effect:       {} allocations, {} bytes",
+            report.allocation_count / n,
+            report.allocated_bytes / n
+        );
     }
 }
 
