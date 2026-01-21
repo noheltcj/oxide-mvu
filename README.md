@@ -6,58 +6,58 @@
 [![License](https://img.shields.io/crates/l/oxide-mvu.svg)](LICENSE)
 [![Downloads](https://img.shields.io/crates/d/oxide-mvu.svg)](https://crates.io/crates/oxide-mvu)
 
-A lightweight Model-View-Update (MVU) runtime framework for Rust with `no_std` support.
+A lightweight Model-View-Update (MVU) runtime for Rust with `no_std` support.
 
-[Documentation](https://docs.rs/oxide-mvu) | [Crates.io](https://crates.io/crates/oxide-mvu) | [Repository](https://github.com/noheltcj/oxide-mvu) | [Examples](https://github.com/noheltcj/oxide-mvu/tree/main/tests)
+- **[Documentation](https://docs.rs/oxide-mvu)**
+- **[Crates.io](https://crates.io/crates/oxide-mvu)**
 
-## Overview
+---
 
-__(Note that this framework is not yet ready for production, and APIs should not be considered stable)__
+> **Note:** This framework is under active development. APIs should not be considered stable.
 
-`oxide-mvu` implements the MVU pattern for building predictable, testable applications in Rust. The framework is powerful enough
-to be a good choice for most applications, but will always evolve with support for no_std, low-memory, single-cpu, embedded systems as a baseline.
+## What is MVU?
 
-Oxide is intended to clarify the management of state in an application using clear separation of concerns between cleanly isolated view and application logic layers.
+The **Model-View-Update** pattern (also known as the Elm Architecture) structures applications as a pure functional loop:
 
-## Features
+- **Model**: Immutable state representing your entire application
+- **Update**: Pure function transforming `(Event, Model) → (Model, Effect)`
+- **View**: Pure function deriving renderable Props from the Model
 
-- **Unidirectional data flow**: State transitions occur in a single loop:
-  - → event emission is triggered from an effect or user input
-  - → update function receives event data and yields new state
-  - → view function reduces state to renderable props
-  - → renderer function receives props for display
-- **Async/await support**: Non-blocking event loop using async channels
-- **Lock-free concurrency**: Events can be emitted from any thread without mutex overhead
-- **Type-safe event dispatch**: Callbacks in Props maintain type safety
-- **Effect system**: Controlled, declarative side effects
-- **no_std support**: Works in embedded environments (requires `alloc` for heap allocation)
+This architecture eliminates implicit state mutation, making your application **predictable**, **debuggable**, and **testable**.
 
-## Installation
+## Why oxide-mvu?
 
-Add to your `Cargo.toml`:
+- **Pure functional state management** - All state transitions are explicit and testable
+- **Unidirectional data flow** - Easy to reason about and debug
+- **Lock-free concurrency** - Events from any thread without mutex overhead
+- **Async runtime agnostic** - Works with tokio, async-std, smol, or custom executors
+- **Built-in testing utilities** - Comprehensive test helpers included
+- **`no_std` support** - Suitable for embedded systems (requires `alloc`)
+
+## Quick Start
+
+### Installation
 
 ```toml
 [dependencies]
 oxide-mvu = "0.4.0"
 ```
 
-For `no_std` environments:
-```toml
-[dependencies]
-oxide-mvu = { version = "0.4.0", features = ["no_std"] }
-```
+### Documentation
 
-## Usage
+For comprehensive guides, architecture details, and advanced usage, see the **[API Documentation](https://docs.rs/oxide-mvu)**.
 
-### Define your types
+<details>
+<summary>Example: Constructing a minimalistic runtime loop</summary>
 
 ```rust
-use oxide_mvu::{Emitter, Effect, MvuLogic};
+use oxide_mvu::{Emitter, Effect, MvuLogic, MvuRuntime, Renderer};
 
+// 1. Model the system, its behavior, and the renderable
+//    projection (Props) including any controls.
 #[derive(Clone)]
 enum Event {
     Increment,
-    Decrement,
 }
 
 #[derive(Clone)]
@@ -67,14 +67,10 @@ struct Model {
 
 struct Props {
     count: i32,
-    on_increment: Box<dyn Fn()>,
-    on_decrement: Box<dyn Fn()>,
+    on_click: Box<dyn Fn()>,
 }
-```
 
-### Implement the MvuLogic trait
-
-```rust
+// 2. Implement application logic
 struct Logic;
 
 impl MvuLogic<Event, Model, Props> for Logic {
@@ -83,105 +79,65 @@ impl MvuLogic<Event, Model, Props> for Logic {
     }
 
     fn update(&self, event: Event, model: &Model) -> (Model, Effect<Event>) {
-        let new_model = match event {
-            Event::Increment => Model { count: model.count + 1 },
-            Event::Decrement => Model { count: model.count - 1 },
-        };
-        (new_model, Effect::none())
+        match event {
+            Event::Increment => (Model { count: model.count + 1 }, Effect::none()),
+        }
     }
 
     fn view(&self, model: &Model, emitter: &Emitter<Event>) -> Props {
-        let emitter_inc = emitter.clone();
-        let emitter_dec = emitter.clone();
+        let emitter = emitter.clone();
         Props {
             count: model.count,
-            on_increment: Box::new(move || { emitter_inc.try_emit(Event::Increment); }),
-            on_decrement: Box::new(move || { emitter_dec.try_emit(Event::Decrement); }),
+            on_click: Box::new(move || emitter.clone().try_emit(Event::Increment)),
         }
     }
 }
-```
 
-### Implement a Renderer
-
-```rust
-use oxide_mvu::Renderer;
-
+// 3. Implement a renderer to display Props.
 struct MyRenderer;
 
 impl Renderer<Props> for MyRenderer {
     fn render(&mut self, props: Props) {
         println!("Count: {}", props.count);
-        // In a real app, you'd render UI here and wire up callbacks:
-        // button.on_click = props.on_increment;
     }
 }
-```
 
-### Create a Spawner
-
-The runtime needs a spawner to execute async effects. The spawner is framework-agnostic,
-allowing you to use any async runtime (tokio, async-std, smol, etc.). Any function or
-closure that implements the `Spawner` trait will work:
-
-#### Using tokio:
-```rust
-let spawner = |fut| {
-    tokio::spawn(fut);
-};
-```
-
-#### Using async-std:
-```rust
-let spawner = |fut| {
-    async_std::task::spawn(fut);
-};
-```
-
-### Run the application
-
-The runtime uses async/await for non-blocking event processing. You can either await the runtime directly or spawn it:
-
-```rust
-use oxide_mvu::MvuRuntime;
-
-#[tokio::main]
+// 4. Run the application
 async fn main() {
-    let model = Model { count: 0 };
-    let logic = Logic;
-    let renderer = MyRenderer;
+    let runtime = MvuRuntime::builder(
+        Model { count: 0 },
+        Logic {},
+        MyRenderer {},
+        |fut| { tokio::spawn(fut); },
+    ).build();
 
-    // Create a spawner for your chosen async runtime
-    let spawner = |fut| {
-        tokio::spawn(fut);
-    };
-
-    let runtime = MvuRuntime::builder(model, logic, renderer, spawner).build();
-
-    // Run the event loop (consumes the runtime)
     runtime.run().await;
 }
 ```
 
-### Configuring Event Buffer Capacity
+</details>
 
-The runtime uses a bounded channel to queue events. The default capacity (`DEFAULT_EVENT_CAPACITY = 32`) is sized for embedded systems with limited heap. You can customize this via the builder:
+## Platform Support
 
-```rust
-use oxide_mvu::MvuRuntime;
+### Standard Environments
 
-// For memory-constrained embedded systems
-let runtime = MvuRuntime::builder(model, logic, renderer, spawner)
-    .capacity(8)
-    .build();
+By default, `oxide-mvu` works with the standard library:
 
-// For high-throughput applications with event bursts
-let runtime = MvuRuntime::builder(model, logic, renderer, spawner)
-    .capacity(1024)
-    .build();
+```toml
+[dependencies]
+oxide-mvu = "0.4.0"
 ```
 
-When the buffer is full, `Emitter::try_emit()` returns `false` and the event is dropped. Use `Emitter::emit().await` if you need backpressure (waits until space is available).
+### `no_std` Environments
+
+For embedded systems without the standard library:
+
+```toml
+[dependencies]
+oxide-mvu = { version = "0.4.0", features = ["no_std"] }
+```
+
+The runtime uses lock-free concurrency and bounded channels, making it suitable for resource-constrained systems (including single-core). Requires an allocator (`alloc` crate).
 
 ## Testing
 
@@ -205,6 +161,9 @@ This gives you access to:
 
 State transitions are pure functions, making them easy to unit test:
 
+<details>
+<summary>Example: Testing state transitions</summary>
+
 ```rust
 #[test]
 fn test_increment() {
@@ -215,9 +174,15 @@ fn test_increment() {
 }
 ```
 
+</details>
+
 ### Integration Testing
 
-Use `TestMvuRuntime` and `TestRenderer` to test the full MVU loop:
+Use `TestMvuRuntime::builder` to construct and manually drive the runtime deterministically.
+To verify Props, keep a reference to the `TestRenderer`.
+
+<details>
+<summary>Example: Testing the complete MVU loop</summary>
 
 ```rust
 use oxide_mvu::{TestMvuRuntime, TestRenderer, create_test_spawner};
@@ -230,7 +195,7 @@ fn test_full_mvu_loop() {
     // Create runtime with test helpers
     let runtime = TestMvuRuntime::builder(
         Model { count: 0 },
-        Logic,
+        Logic {},
         renderer.clone(),
         create_test_spawner(),
     ).build();
@@ -246,7 +211,7 @@ fn test_full_mvu_loop() {
 
     // Trigger event via Props callback
     renderer.with_renders(|renders| {
-        (renders[0].on_increment)();
+        (renders[0].on_click)();
     });
 
     // Manually process events
@@ -260,7 +225,14 @@ fn test_full_mvu_loop() {
 }
 ```
 
-See the `tests` directory for more examples.
+</details>
+
+See the [tests/integration](tests/integration) directory for more examples.
+
+## Learn More
+
+- **[API Documentation](https://docs.rs/oxide-mvu)** - Complete API reference with examples
+- **[Tests](tests)** - Tests demonstrating common patterns
 
 ## License
 
