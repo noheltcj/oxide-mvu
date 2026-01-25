@@ -40,13 +40,13 @@ This architecture eliminates implicit state mutation, making your application **
 
 ```toml
 [dependencies]
-oxide-mvu = "0.4.1"
+oxide-mvu = "0.4.2"
 ```
 
 For embedded systems (`no_std`):
 ```toml
 [dependencies]
-oxide-mvu = { version = "0.4.1", features = ["no_std"] }
+oxide-mvu = { version = "0.4.2", features = ["no_std"] }
 ```
 
 <details>
@@ -146,7 +146,7 @@ For integration testing, use the `testing` feature:
 
 ```toml
 [dev-dependencies]
-oxide-mvu = { version = "0.4.1", features = ["testing"] }
+oxide-mvu = { version = "0.4.2", features = ["testing"] }
 ```
 
 This provides:
