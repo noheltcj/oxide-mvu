@@ -110,20 +110,16 @@ Benefits:
 .
 ├── Cargo.toml                         # Project configuration
 ├── Dockerfile                         # Docker image with Renode + toolchain
-├── .dockerignore                      # Docker build exclusions
-├── .cargo/
-│   └── config.toml                   # Build target configuration
 ├── memory.x                           # Linker script (1MB Flash, 256KB RAM, 16KB stack)
 ├── renode.resc                        # Renode startup script for nRF52840
-├── nrf52840-with-peripherals.repl    # Renode platform definition (LED + button)
-├── run.sh                             # Build and run in Renode
+├── nrf52840-with-peripherals.repl     # Renode platform definition (LED + button)
 ├── test-docker.sh                     # Docker build + run wrapper
 └── src/
-    ├── main.rs                       # Platform setup (peripherals, runtime, tasks)
-    ├── app.rs                        # Pure MVU application logic
-    ├── renderer.rs                   # UART + LED renderer
-    ├── effects.rs                    # Effect traits + Embassy implementations
-    └── uart.rs                       # Buffered UART output
+    ├── main.rs                        # Platform setup (peripherals, runtime, tasks)
+    ├── app.rs                         # MVU application logic
+    ├── renderer.rs                    # UART + LED renderer
+    ├── effects.rs                     # Effect traits + Embassy HAL implementations
+    └── uart.rs                        # UART task + channel buffering
 ```
 
 ## Resources
@@ -131,4 +127,3 @@ Benefits:
 - [oxide-mvu Documentation](https://docs.rs/oxide-mvu) - Full MVU pattern documentation
 - [Embassy Project](https://embassy.dev/) - Async embedded framework for Rust
 - [The Embedded Rust Book](https://docs.rust-embedded.org/book/) - Embedded Rust fundamentals
-- [cortex-m-quickstart](https://github.com/rust-embedded/cortex-m-quickstart) - Cortex-M project template
