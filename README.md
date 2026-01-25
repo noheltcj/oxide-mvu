@@ -43,9 +43,11 @@ This architecture eliminates implicit state mutation, making your application **
 oxide-mvu = "0.4.1"
 ```
 
-### Documentation
-
-For comprehensive guides, architecture details, and advanced usage, see the **[API Documentation](https://docs.rs/oxide-mvu)**.
+For embedded systems (`no_std`):
+```toml
+[dependencies]
+oxide-mvu = { version = "0.4.1", features = ["no_std"] }
+```
 
 <details>
 <summary>Example: Constructing a minimalistic runtime loop</summary>
@@ -117,52 +119,18 @@ async fn main() {
 
 </details>
 
-## Platform Support
+## Examples
 
-### Standard Environments
+Working examples demonstrating `oxide-mvu` in various environments:
 
-By default, `oxide-mvu` works with the standard library:
+- **[cortex-m-single-core](examples/cortex-m-single-core)** - Complete `no_std` embedded example running on 
+nRF52840 (Cortex-M4F) with Embassy async runtime, emulated via Renode.
 
-```toml
-[dependencies]
-oxide-mvu = "0.4.1"
-```
-
-### `no_std` Environments
-
-For embedded systems without the standard library:
-
-```toml
-[dependencies]
-oxide-mvu = { version = "0.4.1", features = ["no_std"] }
-```
-
-The runtime uses lock-free concurrency and bounded channels, making it suitable for resource-constrained systems (including single-core). Requires an allocator (`alloc` crate).
+See the [examples](examples) directory for more.
 
 ## Testing
 
-`oxide-mvu` provides specialized testing utilities for integration testing your MVU applications.
-
-### Enabling Testing Utilities
-
-To access the testing helpers in your project, enable the `testing` feature:
-
-```toml
-[dev-dependencies]
-oxide-mvu = { version = "0.4.1", features = ["testing"] }
-```
-
-This gives you access to:
-- `TestMvuRuntime` - Runtime with manual event processing control
-- `TestMvuDriver` - Driver for manually processing events in tests
-- `TestRenderer` - Renderer that captures Props for assertions
-
-### Unit Testing
-
-State transitions are pure functions, making them easy to unit test:
-
-<details>
-<summary>Example: Testing state transitions</summary>
+The MVU pattern makes applications easy to test. State transitions are pure functions:
 
 ```rust
 #[test]
@@ -174,25 +142,27 @@ fn test_increment() {
 }
 ```
 
-</details>
+For integration testing, use the `testing` feature:
 
-### Integration Testing
+```toml
+[dev-dependencies]
+oxide-mvu = { version = "0.4.1", features = ["testing"] }
+```
 
-Use `TestMvuRuntime::builder` to construct and manually drive the runtime deterministically.
-To verify Props, keep a reference to the `TestRenderer`.
+This provides:
+- `TestMvuRuntime` - Runtime with manual event processing control
+- `TestRenderer` - Renderer that captures Props for assertions
+- `create_test_spawner()` - Test-friendly task spawner
 
 <details>
-<summary>Example: Testing the complete MVU loop</summary>
+<summary>Example: Integration testing the complete MVU loop</summary>
 
 ```rust
 use oxide_mvu::{TestMvuRuntime, TestRenderer, create_test_spawner};
 
 #[test]
 fn test_full_mvu_loop() {
-    // Create a TestRenderer to capture renders
     let renderer = TestRenderer::new();
-
-    // Create runtime with test helpers
     let runtime = TestMvuRuntime::builder(
         Model { count: 0 },
         Logic {},
@@ -200,7 +170,6 @@ fn test_full_mvu_loop() {
         create_test_spawner(),
     ).build();
 
-    // Run and get driver for manual event control
     let mut driver = runtime.run();
 
     // Verify initial render
@@ -209,15 +178,11 @@ fn test_full_mvu_loop() {
         assert_eq!(renders[0].count, 0);
     });
 
-    // Trigger event via Props callback
-    renderer.with_renders(|renders| {
-        (renders[0].on_click)();
-    });
-
-    // Manually process events
+    // Trigger the Props callback and advance the runtime
+    renderer.with_renders(|renders| (renders[0].on_click)());
     driver.process_events();
 
-    // Verify a second render occurred
+    // Verify update
     assert_eq!(renderer.count(), 2);
     renderer.with_renders(|renders| {
         assert_eq!(renders[1].count, 1);
@@ -227,11 +192,12 @@ fn test_full_mvu_loop() {
 
 </details>
 
-See the [tests/integration](tests/integration) directory for more examples.
+See the [tests](tests) directory for more examples.
 
 ## Learn More
 
 - **[API Documentation](https://docs.rs/oxide-mvu)** - Complete API reference with examples
+- **[Examples](examples)** - Working examples in various environments
 - **[Tests](tests)** - Tests demonstrating common patterns
 
 ## License

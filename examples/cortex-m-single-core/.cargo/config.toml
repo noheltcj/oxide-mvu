@@ -1,0 +1,10 @@
+[build]
+# Target Cortex-M4F (with hardware floating point)
+# This matches common development boards like nRF52840 DK
+target = "thumbv7em-none-eabihf"
+
+[target.thumbv7em-none-eabihf]
+# Use LLD linker (faster than GNU ld)
+rustflags = [
+  "-C", "link-arg=-Tlink.x",
+]

@@ -348,7 +348,7 @@
 //!
 //! The [`Spawner`] trait abstracts over different async runtimes. Common patterns:
 //!
-//! ```rust,ignore
+//! ```rust,no-run
 //! // tokio
 //! let spawner = |fut| { tokio::spawn(fut); };
 //!

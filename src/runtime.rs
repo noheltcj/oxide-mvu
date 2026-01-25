@@ -4,11 +4,10 @@
 use alloc::boxed::Box;
 
 use core::future::Future;
-use core::pin::Pin;
 
 use async_channel::{bounded, Receiver};
 
-use crate::Event as EventTrait;
+use crate::{Effect, Event as EventTrait};
 use crate::{Emitter, MvuLogic, Renderer};
 
 /// Default event channel capacity.
@@ -97,6 +96,8 @@ where
         }
     }
 }
+
+use core::pin::Pin;
 
 /// A spawner trait for executing futures on an async runtime.
 ///
@@ -243,9 +244,7 @@ where
         self.renderer.render(initial_props);
 
         // Execute initial effect by spawning it
-        let emitter = self.emitter.clone();
-        let future = init_effect.execute(&emitter);
-        self.spawner.spawn(Box::pin(future));
+        Self::spawn_effect(&self.spawner, &self.emitter, init_effect);
 
         // Event processing loop
         while let Ok(event) = self.event_receiver.recv().await {
@@ -265,9 +264,23 @@ where
         self.model = new_model;
 
         // Execute the effect
-        let emitter = self.emitter.clone();
-        let future = effect.execute(&emitter);
-        self.spawner.spawn(Box::pin(future));
+        Self::spawn_effect(&self.spawner, &self.emitter, effect);
+    }
+
+    pub fn spawn_effect(spawner: &Spawn, emitter: &Emitter<Event>, effect: Effect<Event>) {
+        match effect {
+            Effect::None => {}
+            Effect::Just(event) => {
+                let emitter = emitter.clone();
+                spawner.spawn(Box::pin(async move { emitter.emit(event).await }));
+            }
+            Effect::Async(boxed_future) => spawner.spawn(boxed_future.call_box(emitter)),
+            Effect::Batch(effects) => {
+                for effect in effects {
+                    Self::spawn_effect(spawner, emitter, effect);
+                }
+            }
+        }
     }
 }
 
@@ -500,8 +513,11 @@ where
         self.runtime.renderer.render(initial_props);
 
         // Execute initial effect by spawning it
-        let future = init_effect.execute(&self.runtime.emitter);
-        self.runtime.spawner.spawn(Box::pin(future));
+        MvuRuntime::<Event, Model, Props, Logic, Render, Spawn>::spawn_effect(
+            &self.runtime.spawner,
+            &self.runtime.emitter,
+            init_effect,
+        );
 
         TestMvuDriver { _runtime: self }
     }

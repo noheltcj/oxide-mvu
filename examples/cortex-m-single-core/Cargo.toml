@@ -1,0 +1,31 @@
+[package]
+name = "cortex-m-single-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+oxide-mvu = { path = "../..", features = ["no_std"] }
+
+# Cortex-M runtime and processor support
+cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7.3"
+
+# Panic handler for no_std
+panic-halt = "1.0"
+
+# Embassy async runtime for no_std embedded systems
+embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread"] }
+embassy-nrf = { version = "0.9", features = ["nrf52840", "time-driver-rtc1", "gpiote", "reset-pin-as-gpio"] }
+embassy-sync = "0.7"
+embassy-time = "0.5"
+
+# Allocator for no_std
+embedded-alloc = "0.7"
+
+[profile.dev]
+opt-level = 1  # Optimize even debug builds for embedded
+
+[profile.release]
+opt-level = "z"  # Optimize for size
+lto = true
+codegen-units = 1
