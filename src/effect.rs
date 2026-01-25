@@ -40,28 +40,18 @@ use crate::Event as EventTrait;
 /// // No side effects
 /// let effect: Effect<Event> = Effect::none();
 /// ```
-pub struct Effect<Event: EventTrait>(Box<dyn FnOnceBox<Event> + Send>);
+pub enum Effect<Event: EventTrait> {
+    /// No side effects.
+    None,
+    /// Emit a single event immediately.
+    Just(Event),
+    /// Combine multiple effects.
+    Batch(Vec<Effect<Event>>),
+    /// Async effect with arbitrary async logic.
+    Async(Box<dyn FnOnceBox<Event> + Send>),
+}
 
 impl<Event: EventTrait> Effect<Event> {
-    /// Execute the effect, consuming it and returning a future.
-    ///
-    /// The returned future will be spawned on your async runtime using the provided spawner.
-    pub fn execute(self, emitter: &Emitter<Event>) -> Pin<Box<dyn Future<Output = ()> + Send>> {
-        self.0.call_box(emitter)
-    }
-
-    /// Create an empty effect.
-    ///
-    /// This is private - use [`Effect::none()`] instead.
-    fn new() -> Self {
-        fn empty_fn<Event: EventTrait>(
-            _: &Emitter<Event>,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
-            Box::pin(async {})
-        }
-        Self(Box::new(empty_fn))
-    }
-
     /// Create an effect that just emits a single event.
     ///
     /// Useful for triggering immediate follow-up events.
@@ -77,11 +67,7 @@ impl<Event: EventTrait> Effect<Event> {
     /// let effect = Effect::just(Event::Refresh);
     /// ```
     pub fn just(event: Event) -> Self {
-        Self(Box::new(move |emitter: &Emitter<Event>| {
-            let emitter = emitter.clone();
-            Box::pin(async move { emitter.emit(event).await })
-                as Pin<Box<dyn Future<Output = ()> + Send>>
-        }))
+        Effect::Just(event)
     }
 
     /// Create an empty effect.
@@ -99,7 +85,7 @@ impl<Event: EventTrait> Effect<Event> {
     /// let effect: Effect<Event> = Effect::none();
     /// ```
     pub fn none() -> Self {
-        Self::new()
+        Effect::None
     }
 
     /// Combine multiple effects into a single effect.
@@ -121,14 +107,7 @@ impl<Event: EventTrait> Effect<Event> {
     /// ]);
     /// ```
     pub fn batch(effects: Vec<Effect<Event>>) -> Self {
-        Self(Box::new(move |emitter: &Emitter<Event>| {
-            let emitter = emitter.clone();
-            Box::pin(async move {
-                for effect in effects {
-                    effect.execute(&emitter).await;
-                }
-            }) as Pin<Box<dyn Future<Output = ()> + Send>>
-        }))
+        Effect::Batch(effects)
     }
 
     /// Create an effect from an async function using a runtime-agnostic spawner.
@@ -193,14 +172,14 @@ impl<Event: EventTrait> Effect<Event> {
         F: FnOnce(Emitter<Event>) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        Self(Box::new(move |emitter: &Emitter<Event>| {
+        Effect::Async(Box::new(move |emitter: &Emitter<Event>| {
             let future = f(emitter.clone());
             Box::pin(future) as Pin<Box<dyn Future<Output = ()> + Send>>
         }))
     }
 }
 
-trait FnOnceBox<Event: EventTrait> {
+pub trait FnOnceBox<Event: EventTrait> {
     fn call_box(
         self: Box<Self>,
         emitter: &Emitter<Event>,

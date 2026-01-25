@@ -1,0 +1,5 @@
+button1: Miscellaneous.Button @ gpio0 11
+    invert: true
+    -> gpio0@11
+
+led1: Miscellaneous.LED @ gpio0 13

@@ -1,0 +1,20 @@
+using sysbus
+
+mach create "oxide-mvu-nrf52840"
+
+# Load base nRF52840 platform
+machine LoadPlatformDescription @platforms/cpus/nrf52840.repl
+
+# Add button and LED peripherals from our custom file
+machine LoadPlatformDescription @nrf52840-with-peripherals.repl
+
+$bin=@target/thumbv7em-none-eabihf/release/cortex-m-single-core
+
+# Flash the device
+sysbus LoadELF $bin
+
+# Show UART output
+showAnalyzer sysbus.uart0
+
+# Start the machine
+start
