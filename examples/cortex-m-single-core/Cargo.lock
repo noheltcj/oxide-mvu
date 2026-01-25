@@ -572,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "oxide-mvu"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "async-channel",
  "portable-atomic-util",
