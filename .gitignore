@@ -14,8 +14,11 @@ target/
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
-# Loadout
+# Loadout CLI - Local Mode
+# Loadout local runtime state
+.loadout.json
+.loadout.local.json
+.loadouts/
 AGENTS.md
 CLAUDE.md
-.loadout.json
-.loadouts/
+GEMINI.md
